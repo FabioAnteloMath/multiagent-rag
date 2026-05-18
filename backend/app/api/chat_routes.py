@@ -1,15 +1,21 @@
-from pydantic import BaseModel, Field
-from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel, Field, field_validator
+from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.security import detect_prompt_injection, sanitize_input
 from app.services.rag_pipeline import RagPipeline
 from app.agents.master_agent import MasterAgent
 from app.models import Agent
 
 router = APIRouter()
 pipeline = RagPipeline()
+
+limiter = Limiter(key_func=get_remote_address)
 
 
 def get_master_agent(db: Session = Depends(get_db)) -> MasterAgent:
@@ -55,10 +61,18 @@ class IngestResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str = Field(min_length=3)
+    question: str = Field(min_length=3, max_length=1000)
     top_k: int = Field(default=4, ge=1, le=10)
     mode: str = Field(default="auto", pattern="^(baseline|auto|single_rag)$")
     force_agent: Optional[str] = Field(default=None, pattern="^(suporte_api|database|devops)$")
+
+    @field_validator("question")
+    @classmethod
+    def validate_question(cls, v: str) -> str:
+        v = sanitize_input(v)
+        if detect_prompt_injection(v):
+            raise ValueError("Invalid input detected")
+        return v
 
 
 class AskResponse(BaseModel):
@@ -76,12 +90,14 @@ class AskResponse(BaseModel):
 
 
 @router.get("/health")
-def healthcheck() -> dict[str, str]:
+@limiter.limit("60/minute")
+def healthcheck(request: Request) -> dict[str, str]:
     return {"status": "ok"}
 
 
 @router.post("/ingest", response_model=IngestResponse)
-def ingest_documents(payload: IngestRequest) -> IngestResponse:
+@limiter.limit("10/minute")
+def ingest_documents(request: Request, payload: IngestRequest) -> IngestResponse:
     if payload.chunk_overlap >= payload.chunk_size:
         raise HTTPException(
             status_code=400,
@@ -102,7 +118,8 @@ def ingest_documents(payload: IngestRequest) -> IngestResponse:
 
 
 @router.post("/ask", response_model=AskResponse)
-def ask_question(payload: AskRequest, db: Session = Depends(get_db)) -> AskResponse:
+@limiter.limit("30/minute")
+def ask_question(request: Request, payload: AskRequest, db: Session = Depends(get_db)) -> AskResponse:
     print(f"[API] ask_question called - mode: {payload.mode}, question: {payload.question[:50]}...")
     try:
         if payload.mode == "baseline":
