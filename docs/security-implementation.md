@@ -2,7 +2,7 @@
 
 ## Multiagent RAG - Support Copilot
 
-**Version**: 0.2.1
+**Version**: 0.3.0
 **Last Updated**: 2025
 **Status**: Implemented
 
@@ -10,13 +10,148 @@
 
 ## Overview
 
-This document describes the security measures implemented in the Multiagent RAG Support Copilot project. All security features were added in a dedicated PR to maintain clean git history and focused changes.
+This document describes the security measures implemented in the Multiagent RAG Support Copilot project.
 
 ---
 
-## 1. Rate Limiting
+## Architecture
 
-Implemented using `slowapi` library to prevent abuse and ensure service availability.
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    chat_routes.py (API)                          │
+│  AskRequest.validate_question()                                   │
+└──────────────────────────┬────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   SecurityService                               │
+│  ┌─────────────────┐  ┌────────────────┐  ┌───────────────┐  │
+│  │  SecurityCache   │  │ Pattern Match  │  │ MiniMax-Text- │  │
+│  │  (LRU, TTL)     │  │ (11 patterns)  │  │ 01 (LLM)      │  │
+│  └─────────────────┘  └────────────────┘  └───────────────┘  │
+│                                                                  │
+│  check(text) → sanitize → pattern_match ──┐                     │
+│                                          ↓                       │
+│                           if pattern detected → BLOCK             │
+│                           else → LLM classification → BLOCK/ALLOW │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Flow
+
+1. **Input arrives** → `sanitize_input()` removes control chars
+2. **Pattern Match** → Fast regex check (11 patterns)
+3. **If detected** → Block immediately (confidence: 0.95)
+4. **If clean** → MiniMax-Text-01 LLM classification
+5. **Result cached** → LRU cache with TTL for performance
+
+### Graceful Degradation
+
+```
+LLM Available + Clean Pattern?
+├── YES → MiniMax-Text-01 classification (2s timeout)
+│         └── Timeout? → Allow (confidence: 0.7)
+└── NO  → Pattern-match only mode (confidence: 0.7)
+```
+
+---
+
+## 1. SecurityService (Core)
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Two-layer detection** | Pattern match (fast) + LLM classification (accurate) |
+| **Async support** | `async check()` for non-blocking operations |
+| **Timeout** | 2s max for LLM calls (prevents slow-doS) |
+| **LRU Cache** | 1000 entries, 5min TTL, ~50ms avg lookup |
+| **Graceful degradation** | LLM fail → pattern-match fallback |
+| **Singleton pattern** | `get_security_service()` for DI |
+
+### Configuration
+
+```python
+SecurityService(
+    provider="minimax",           # LLM provider
+    model_name="MiniMax-Text-01", # Fast, cheap model
+    temperature=0.0,              # Deterministic
+    timeout_seconds=2.0,         # Max LLM wait
+    llm_enabled=True             # Disable for testing
+)
+```
+
+### MiniMax-Text-01
+
+| Aspect | Value |
+|--------|-------|
+| **Role** | Security classification (binary) |
+| **Speed** | ~200-500ms |
+| **Cost** | $0.001/1K tokens (very cheap) |
+| **Temperature** | 0.0 (deterministic) |
+| **Max tokens** | 10 (just INJECTION/SAFE) |
+
+### SecurityCheckResult
+
+```python
+@dataclass
+class SecurityCheckResult:
+    is_safe: bool                    # Final verdict
+    method: str                      # "pattern_match" or "llm_classification"
+    confidence: float               # 0.7 (pattern-only) or 0.85 (LLM)
+    processing_time_ms: float       # For monitoring
+    attack_type: Optional[str]       # "instruction_override", "xss", etc.
+    raw_response: Optional[str]      # LLM raw response for debugging
+```
+
+### Attack Types
+
+| Type | Example Pattern |
+|------|----------------|
+| `instruction_override` | "ignore all previous", "disregard your instructions" |
+| `memory_override` | "forget everything" |
+| `role_play_attack` | "you are now a different", "pretend you are" |
+| `system_override` | "override your system" |
+| `security_bypass` | "bypass your security" |
+| `prompt_injection` | "system prompt:" |
+| `model_impersonation` | "new AI model" |
+| `xss` | `<script>` |
+| `protocol_injection` | `javascript:` |
+
+---
+
+## 2. SecurityCache
+
+In-memory LRU cache for security check results.
+
+```python
+class SecurityCache:
+    def __init__(self, max_size: int = 1000, ttl_seconds: int = 300):
+        self._cache = {}
+        self._timestamps = {}
+        self._max_size = max_size
+        self._ttl = ttl_seconds
+```
+
+| Parameter | Default | Purpose |
+|-----------|---------|---------|
+| `max_size` | 1000 | Max cached entries (prevents memory bloat) |
+| `ttl_seconds` | 300 | Time-to-live (5 min, balances freshness vs perf) |
+
+### Cache Key
+
+```python
+def _make_key(self, text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+```
+
+SHA256 truncated to 16 chars - fast, collision-resistant.
+
+---
+
+## 3. Rate Limiting
+
+Implemented using `slowapi` library to prevent abuse.
 
 ### Configuration
 
@@ -38,60 +173,44 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 ```
 
-```python
-# backend/app/api/chat_routes.py
-@router.get("/health")
-@limiter.limit("60/minute")
-def healthcheck(request: Request) -> dict[str, str]:
-    return {"status": "ok"}
-```
+### Rate Limit Response
 
-### Response on Rate Limit Exceeded
-
-When rate limit is exceeded, the API returns:
 ```json
-{
-  "error": "Rate limit exceeded: 60/minute"
-}
+{"error": "Rate limit exceeded: 30/minute"}
 ```
 
 ---
 
-## 2. Input Validation
+## 4. Input Validation
 
-### Question Length Validation
+### AskRequest Validation
 
 ```python
 class AskRequest(BaseModel):
     question: str = Field(min_length=3, max_length=1000)
     top_k: int = Field(default=4, ge=1, le=10)
     mode: str = Field(default="auto", pattern="^(baseline|auto|single_rag)$")
-    force_agent: Optional[str] = Field(default=None, pattern="^(suporte_api|database|devops)$")
 ```
 
-- **Minimum length**: 3 characters (prevents empty queries)
-- **Maximum length**: 1000 characters (prevents resource exhaustion)
+| Field | Validation | Purpose |
+|-------|------------|---------|
+| `question` | min=3, max=1000 | Prevents empty/long queries |
+| `top_k` | ge=1, le=10 | Bounds search depth |
+| `mode` | enum | Restricts to valid modes |
 
-### Ingest Parameters Validation
+### IngestRequest Validation
 
 ```python
 class IngestRequest(BaseModel):
-    clear_existing: bool = True
     chunk_size: int = Field(default=600, ge=200, le=2000)
     chunk_overlap: int = Field(default=80, ge=0, le=500)
 ```
 
-- `chunk_size`: Between 200 and 2000
-- `chunk_overlap`: Between 0 and 500, must be less than chunk_size
-
 ---
 
-## 3. CORS Configuration
-
-### Implementation
+## 5. CORS Configuration
 
 ```python
-# backend/app/main.py
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
 
 app.add_middleware(
@@ -103,24 +222,15 @@ app.add_middleware(
 )
 ```
 
-### Configuration
-
-- **Default**: `http://localhost:3000`
-- **Environment Variable**: `ALLOWED_ORIGINS` (comma-separated list)
-- **Allowed Methods**: GET, POST, PUT, DELETE (no PATCH, DELETE for reduced attack surface)
-- **Allowed Headers**: Authorization, Content-Type (no wildcard headers)
-
-### Production Example
-
-```bash
-export ALLOWED_ORIGINS="https://app.example.com,https://admin.example.com"
-```
+| Setting | Value | Security Benefit |
+|---------|-------|-----------------|
+| `allow_methods` | Limited to CRUD | Reduces attack surface |
+| `allow_headers` | Only auth headers | Prevents header injection |
+| `allow_credentials` | True | Allows JWT cookies |
 
 ---
 
-## 4. Security Headers
-
-Implemented via middleware in `main.py`.
+## 6. Security Headers
 
 ```python
 @app.middleware("http")
@@ -134,21 +244,17 @@ async def security_headers_middleware(request: Request, call_next):
     return response
 ```
 
-### Headers Description
-
-| Header | Value | Purpose |
-|--------|-------|---------|
-| X-Content-Type-Options | nosniff | Prevents MIME type sniffing |
-| X-Frame-Options | DENY | Prevents clickjacking via iframes |
-| X-XSS-Protection | 1; mode=block | XSS filter for legacy browsers |
-| Strict-Transport-Security | max-age=31536000 | Enforces HTTPS for 1 year |
-| Content-Security-Policy | default-src 'self' | Prevents XSS and data injection |
+| Header | Value | Protection |
+|--------|-------|-----------|
+| X-Content-Type-Options | nosniff | Prevents MIME sniffing |
+| X-Frame-Options | DENY | Prevents clickjacking |
+| X-XSS-Protection | 1; mode=block | XSS filter (legacy) |
+| Strict-Transport-Security | max-age=1year | Enforces HTTPS |
+| Content-Security-Policy | default-src 'self' | XSS prevention |
 
 ---
 
-## 5. Audit Logging
-
-Implemented via middleware to log all API requests.
+## 7. Audit Logging
 
 ```python
 @app.middleware("http")
@@ -178,21 +284,11 @@ async def audit_logging_middleware(request: Request, call_next):
 [AUDIT] 192.168.1.100 POST /api/ask - 200 - 1523.45ms
 ```
 
-### Benefits
-
-- Request tracking for compliance
-- Performance monitoring
-- Security incident investigation
-- Anomaly detection
-
 ---
 
-## 6. Prompt Injection Detection
-
-### Implementation
+## 8. Prompt Injection Patterns
 
 ```python
-# backend/app/core/security.py
 INJECTION_PATTERNS = [
     re.compile(r"ignore\s+all\s+previous", re.IGNORECASE),
     re.compile(r"forget\s+everything", re.IGNORECASE),
@@ -206,67 +302,13 @@ INJECTION_PATTERNS = [
     re.compile(r"<\s*script\s*>", re.IGNORECASE),
     re.compile(r"javascript\s*:", re.IGNORECASE),
 ]
-
-def detect_prompt_injection(text: str) -> bool:
-    for pattern in INJECTION_PATTERNS:
-        if pattern.search(text):
-            return True
-    return False
 ```
 
-### Detected Patterns
-
-| Category | Patterns |
-|----------|----------|
-| Instruction Override | ignore all previous, forget everything, disregard your instructions |
-| Role Play Attacks | you are now a different, pretend you are |
-| System Override | override your system, bypass your security |
-| Prompt Injection | system prompt:, new AI model |
-| XSS Attempts | `<script>`, `javascript:` |
-
-### Integration with Ask Endpoint
-
-```python
-class AskRequest(BaseModel):
-    question: str = Field(min_length=3, max_length=1000)
-
-    @field_validator("question")
-    @classmethod
-    def validate_question(cls, v: str) -> str:
-        v = sanitize_input(v)
-        if detect_prompt_injection(v):
-            raise ValueError("Invalid input detected")
-        return v
-```
+All patterns use `re.IGNORECASE` for case-insensitive matching.
 
 ---
 
-## 7. Input Sanitization
-
-```python
-def sanitize_input(text: str) -> str:
-    text = text.strip()
-    text = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]', '', text)
-    return text
-```
-
-### Sanitization Steps
-
-1. **Whitespace trimming**: Removes leading/trailing whitespace
-2. **Control character removal**: Removes ASCII control characters (0x00-0x1F and 0x7F)
-
-### Why Control Characters?
-
-Control characters can be used for:
-- Log injection attacks
-- Terminal escape sequence injection
-- Hidden text manipulation
-
----
-
-## 8. Environment Variables
-
-### Required for Production
+## 9. Environment Variables
 
 ```bash
 # .env file (never commit to git)
@@ -274,101 +316,48 @@ MINIMAX_API_KEY=your_api_key_here
 ALLOWED_ORIGINS=https://app.example.com
 ```
 
-### Security Notes
-
-- `.env` files are excluded from git via `.gitignore`
-- API keys should never be committed to version control
-- Use environment variables for all secrets
-
 ---
 
-## 9. Testing
-
-### Security Test Suite
+## 10. Testing
 
 ```bash
 cd backend
-python -m pytest tests/unit/test_security.py -v
+python -m pytest tests/unit/test_security_service.py -v
 ```
 
-### Test Coverage
+### Test Results
 
-| Test Class | Tests | Description |
-|------------|-------|-------------|
-| TestDetectPromptInjection | 13 | Prompt injection pattern detection |
-| TestSanitizeInput | 4 | Input sanitization validation |
-
-### Total Test Results
-
-- **Total tests**: 179 (162 original + 17 security)
-- **All passing**: Yes
+| Suite | Tests | Status |
+|-------|-------|--------|
+| TestSecurityCache | 3 | PASSED |
+| TestSecurityServicePatterns | 8 | PASSED |
+| TestSecurityServiceCheckSync | 3 | PASSED |
+| TestSecurityServiceSingleton | 2 | PASSED |
+| TestSecurityServiceAsync | 2 | PASSED |
+| TestInjectionPatterns | 2 | PASSED |
+| **Total** | **20** | **ALL PASSED** |
 
 ---
 
-## 10. Git History
-
-### Commits
-
-1. **Initial commit** (b11b1dd): Multiagent RAG baseline
-2. **Security improvements** (6c438db): All security features
-
-```
-main -> 6c438db feat: Add security improvements
-                   -> b11b1dd feat: Multiagent RAG Support Copilot - Initial commit
-```
-
----
-
-## 11. Future Security Improvements
-
-The following items were identified but not implemented in this PR:
+## 11. Future Improvements
 
 ### High Priority
 
 - [ ] **Authentication**: Add JWT/OAuth2 for API access
-- [ ] **Web Application Firewall (WAF)**: Consider adding in production
+- [ ] **Output filtering**: Validate LLM responses for leaks
 
 ### Medium Priority
 
-- [ ] **Request size limits**: Add limits for document uploads
-- [ ] **IP blocking**: Block repeated abuse from specific IPs
-- [ ] **Encrypted communications**: Ensure TLS 1.3 in production
+- [ ] **IP blocking**: Auto-block repeated abuse
+- [ ] **Metrics**: Prometheus metrics for monitoring
+- [ ] **Alerting**: Webhook on security events
 
 ### Low Priority
 
-- [ ] **Security scanning**: Add tools like Bandit for Python security scanning
-- [ ] **Dependency auditing**: Add automated dependency vulnerability scanning
-
----
-
-## 12. Compliance Notes
-
-### Data Handling
-
-- User questions are processed and may be stored in logs
-- No PII should be submitted in questions
-- Audit logs contain IP addresses for security purposes
-
-### Recommendations for Production
-
-1. Deploy behind a reverse proxy (nginx, Traefik)
-2. Enable HTTPS/TLS termination at load balancer
-3. Configure firewall rules
-4. Set up monitoring and alerting
-5. Implement log rotation for audit logs
-6. Regular security audits and penetration testing
-
----
-
-## References
-
-- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
-- [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
-- [slowapi Documentation](https://slowapi.readthedocs.io/)
-- [CSP Builder](https://cspbuilder.online/)
+- [ ] **Security scanning**: Add Bandit for Python
+- [ ] **Dependency audit**: Automated CVE scanning
 
 ---
 
 **Document Version**: 1.0
-**Maintained By**: Fabio Antelo Math
 **Repository**: https://github.com/FabioAnteloMath/multiagent-rag

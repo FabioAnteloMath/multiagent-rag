@@ -7,7 +7,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import detect_prompt_injection, sanitize_input
+from app.core.security_service import get_security_service
 from app.services.rag_pipeline import RagPipeline
 from app.agents.master_agent import MasterAgent
 from app.models import Agent
@@ -69,8 +69,9 @@ class AskRequest(BaseModel):
     @field_validator("question")
     @classmethod
     def validate_question(cls, v: str) -> str:
-        v = sanitize_input(v)
-        if detect_prompt_injection(v):
+        security = get_security_service()
+        result = security.check_sync(v)
+        if not result.is_safe:
             raise ValueError("Invalid input detected")
         return v
 
