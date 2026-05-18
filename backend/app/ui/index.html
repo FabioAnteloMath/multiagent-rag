@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiagent RAG - Support Copilot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            color: #f1f5f9;
+        }
+        .mode-selector {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .mode-btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .mode-btn.baseline {
+            background: #334155;
+            color: #94a3b8;
+        }
+        .mode-btn.baseline.active {
+            background: #3b82f6;
+            color: white;
+        }
+        .mode-btn.multiagent {
+            background: #334155;
+            color: #94a3b8;
+        }
+        .mode-btn.multiagent.active {
+            background: #8b5cf6;
+            color: white;
+        }
+        .chat-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .chat-messages {
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+        .message {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+        .message.user {
+            background: #3b82f6;
+            color: white;
+        }
+        .message.assistant {
+            background: #334155;
+        }
+        .message .sources {
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        .message .meta {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.5rem;
+        }
+        .input-area {
+            display: flex;
+            gap: 0.5rem;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 8px;
+            background: #334155;
+            color: white;
+            font-size: 1rem;
+        }
+        input[type="text"]:focus {
+            outline: 2px solid #3b82f6;
+        }
+        button.send {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            background: #3b82f6;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button.send:hover {
+            background: #2563eb;
+        }
+        button.send:disabled {
+            background: #475569;
+            cursor: not-allowed;
+        }
+        .status {
+            text-align: center;
+            padding: 0.5rem;
+            margin-top: 1rem;
+            border-radius: 8px;
+            display: none;
+        }
+        .status.loading {
+            display: block;
+            background: #334155;
+            color: #94a3b8;
+        }
+        .status.error {
+            display: block;
+            background: #7f1d1d;
+            color: #fca5a5;
+        }
+        .health-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            color: #64748b;
+        }
+        .health-indicator .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #64748b;
+        }
+        .health-indicator.healthy .dot {
+            background: #22c55e;
+        }
+        .health-indicator.unhealthy .dot {
+            background: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Support Copilot</h1>
+
+        <div id="health-indicator" class="health-indicator">
+            <span class="dot"></span>
+            <span id="health-text">Checking...</span>
+        </div>
+
+        <div class="mode-selector">
+            <button id="btn-baseline" class="mode-btn baseline active" onclick="setMode('baseline')">Baseline</button>
+            <button id="btn-multiagent" class="mode-btn multiagent" onclick="setMode('multiagent')">Multi-Agent</button>
+        </div>
+
+        <div class="chat-container">
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="input-area">
+                <input type="text" id="question-input" placeholder="Digite sua pergunta..." onkeypress="handleKeyPress(event)">
+                <button id="send-btn" class="send" onclick="sendQuestion()">Enviar</button>
+            </div>
+        </div>
+
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        let currentMode = 'baseline';
+
+        async function checkHealth() {
+            console.log('[Health] Checking API health...');
+            try {
+                const response = await fetch('/api/health');
+                console.log('[Health] Response status:', response.status);
+                const data = await response.json();
+                console.log('[Health] Response data:', data);
+                const indicator = document.getElementById('health-indicator');
+                const healthText = document.getElementById('health-text');
+                indicator.className = 'health-indicator healthy';
+                healthText.textContent = 'API Online';
+            } catch (e) {
+                console.error('[Health] Error:', e);
+                const indicator = document.getElementById('health-indicator');
+                const healthText = document.getElementById('health-text');
+                indicator.className = 'health-indicator unhealthy';
+                healthText.textContent = 'API Offline';
+            }
+        }
+
+        function setMode(mode) {
+            console.log('[Mode] Switching to:', mode);
+            currentMode = mode;
+            document.getElementById('btn-baseline').classList.toggle('active', mode === 'baseline');
+            document.getElementById('btn-multiagent').classList.toggle('active', mode === 'multiagent');
+        }
+
+        function handleKeyPress(event) {
+            console.log('[KeyPress] Key:', event.key);
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                console.log('[KeyPress] Enter pressed, calling sendQuestion');
+                sendQuestion();
+            }
+        }
+
+        function addMessage(role, content, sources = [], meta = {}) {
+            console.log('[addMessage] role:', role, 'content length:', content.length, 'sources:', sources);
+            const messagesDiv = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+
+            let html = `<div class="content">${content}</div>`;
+
+            if (sources && sources.length > 0) {
+                html += `<div class="sources">Fontes: ${sources.join(', ')}</div>`;
+            }
+
+            if (meta.agent_used) {
+                html += `<div class="meta">Modo: ${meta.agent_used}${meta.steps ? ' | Etapas: ' + meta.steps.join(' → ') : ''}</div>`;
+            }
+
+            console.log('[addMessage] HTML:', html);
+            messageDiv.innerHTML = html;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function showStatus(message, type) {
+            console.log('[Status]', type, ':', message);
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        async function sendQuestion() {
+            console.log('[sendQuestion] START');
+            const input = document.getElementById('question-input');
+            const sendBtn = document.getElementById('send-btn');
+            const question = input.value.trim();
+            console.log('[sendQuestion] Question:', question);
+
+            if (!question) {
+                console.log('[sendQuestion] Empty question, returning');
+                return;
+            }
+
+            addMessage('user', question);
+            input.value = '';
+            sendBtn.disabled = true;
+            showStatus('Enviando...', 'loading');
+
+            const requestBody = {
+                question: question,
+                top_k: 4,
+                mode: currentMode
+            };
+            console.log('[sendQuestion] Request body:', JSON.stringify(requestBody));
+
+            try {
+                console.log('[sendQuestion] Making fetch request to /api/ask...');
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                console.log('[sendQuestion] Response status:', response.status);
+                console.log('[sendQuestion] Response ok:', response.ok);
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    console.error('[sendQuestion] Error response:', error);
+                    throw new Error(error.detail || 'Erro na requisição');
+                }
+
+                const data = await response.json();
+                console.log('[sendQuestion] Response data:', data);
+                console.log('[sendQuestion] Answer:', data.answer);
+                console.log('[sendQuestion] Sources:', data.sources);
+                
+                addMessage('assistant', data.answer, data.sources, {
+                    agent_used: data.agent_used,
+                    steps: data.steps
+                });
+                showStatus('', '');
+            } catch (e) {
+                console.error('[sendQuestion] Catch error:', e.message);
+                showStatus('Erro: ' + e.message, 'error');
+            } finally {
+                console.log('[sendQuestion] Finally - re-enabling button');
+                sendBtn.disabled = false;
+            }
+        }
+
+        console.log('[Init] Setting up initial state');
+        checkHealth();
+        setInterval(checkHealth, 30000);
+    </script>
+</body>
+</html>

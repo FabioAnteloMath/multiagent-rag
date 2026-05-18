@@ -1,0 +1,25 @@
+# Environment variables (API keys, secrets)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+
+# Data files (containing embeddings and processed docs)
+data/
+
+# Node
+node_modules/
+.next/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Logs
+*.log
