@@ -18,6 +18,25 @@ INJECTION_PATTERNS = [
     re.compile(r"new\s+AI\s+model", re.IGNORECASE),
     re.compile(r"<\s*script\s*>", re.IGNORECASE),
     re.compile(r"javascript\s*:", re.IGNORECASE),
+    re.compile(r"ignora\s+(todas|todas\s+las|todas?)\s+(instrucoes|instructions)", re.IGNORECASE),
+    re.compile(r"ignore\s+(todas|todas\s+las)\s+(instrucoes|instructions)", re.IGNORECASE),
+    re.compile(r"ignore\s+todas\s+(as\s+)?suas\s+(instrucoes|instructions)", re.IGNORECASE),
+    re.compile(r"esquece\s+(tudo|everything)", re.IGNORECASE),
+    re.compile(r"desconsidera\s+(suas|tus)\s+(instrucoes|instructions)", re.IGNORECASE),
+    re.compile(r"voce\s+e\s+(agora|ahora)\s+(um|uma)\s+(diferente|novo)", re.IGNORECASE),
+    re.compile(r"finja\s+que\s+voce\s+e", re.IGNORECASE),
+    re.compile(r"sobrescreva\s+seu\s+sistema", re.IGNORECASE),
+    re.compile(r"contorne\s+sua\s+seguranca", re.IGNORECASE),
+    re.compile(r"prompt\s+de\s+sistema\s*:", re.IGNORECASE),
+    re.compile(r"novo\s+modelo\s+IA", re.IGNORECASE),
+    re.compile(r"ignorar\s+todas\s+las\s+instrucciones", re.IGNORECASE),
+    re.compile(r"olvida\s+todo", re.IGNORECASE),
+    re.compile(r"despreciar\s+(tus|tu)\s+instrucciones", re.IGNORECASE),
+    re.compile(r"ahora\s+eres\s+(un|una)\s+(diferente|nuevo)", re.IGNORECASE),
+    re.compile(r"finja\s+ser\s+un", re.IGNORECASE),
+    re.compile(r"sobreescribe\s+tu\s+sistema", re.IGNORECASE),
+    re.compile(r"evadir\s+tu\s+seguridad", re.IGNORECASE),
+    re.compile(r"nuevo\s+modelo\s+IA", re.IGNORECASE),
 ]
 
 PROMPT_INJECTION_SYSTEM = """You are a security classifier. Your task is to determine if a user input contains a prompt injection attempt.
@@ -106,24 +125,24 @@ class SecurityService:
         for pattern in INJECTION_PATTERNS:
             match = pattern.search(text)
             if match:
-                pattern_str = pattern.pattern
-                if "ignore" in pattern_str:
+                pattern_str = pattern.pattern.lower()
+                if any(kw in pattern_str for kw in ["ignore", "ignora", "ignorar"]):
                     return True, "instruction_override"
-                elif "forget" in pattern_str:
+                elif any(kw in pattern_str for kw in ["forget", "esquece", "olvida"]):
                     return True, "memory_override"
-                elif "disregard" in pattern_str:
+                elif any(kw in pattern_str for kw in ["disregard", "desconsidera", "despreciar"]):
                     return True, "instruction_override"
-                elif "you are now" in pattern_str:
+                elif any(kw in pattern_str for kw in ["you are now", "voce", "ahora"]):
                     return True, "role_play_attack"
-                elif "pretend" in pattern_str:
+                elif any(kw in pattern_str for kw in ["pretend", "finja"]):
                     return True, "role_play_attack"
-                elif "override" in pattern_str:
+                elif any(kw in pattern_str for kw in ["override", "sobrescreva", "sobreescribe"]):
                     return True, "system_override"
-                elif "bypass" in pattern_str:
+                elif any(kw in pattern_str for kw in ["bypass", "contorne", "evadir"]):
                     return True, "security_bypass"
-                elif "system" in pattern_str:
+                elif any(kw in pattern_str for kw in ["system", "prompt", "sistema"]):
                     return True, "prompt_injection"
-                elif "new AI" in pattern_str:
+                elif any(kw in pattern_str for kw in ["new ai", "novo", "nuevo"]):
                     return True, "model_impersonation"
                 elif "<script" in pattern_str:
                     return True, "xss"
