@@ -2,7 +2,7 @@
 
 A production-ready Retrieval-Augmented Generation (RAG) system with intelligent multi-agent routing for technical support.
 
-[![Tests](https://img.shields.io/badge/tests-162%20passed-green)](tests/)
+[![Tests](https://img.shields.io/badge/tests-179%20passed-green)](tests/)
 [![Coverage](https://img.shields.io/badge/coverage-69%25-yellow)]()
 [![Python](https://img.shields.io/badge/python-3.11+-blue)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/fastapi-0.115-green)](https://fastapi.tiangolo.com)
@@ -19,7 +19,7 @@ A production-ready Retrieval-Augmented Generation (RAG) system with intelligent 
 - **Multiple Modes**: Baseline (simple RAG), Auto (parallel multi-agent), Single RAG (single agent)
 - **Vector Search**: FAISS for efficient similarity search
 - **Dual LLM Support**: Ollama (local/free) or MiniMax (cloud/paid)
-- **Comprehensive Testing**: 162 tests with 69% code coverage
+- **Comprehensive Testing**: 179 tests with 69% code coverage
 
 ## Architecture
 
@@ -93,7 +93,8 @@ multiagent-rag/
 │   │   │   ├── agente_devops.py    # DevOps agent
 │   │   │   └── agente_generalista.py # General agent
 │   │   ├── core/
-│   │   │   └── database.py         # SQLite connection
+│   │   │   ├── database.py         # SQLite connection
+│   │   │   └── security.py         # Rate limiting, prompt injection
 │   │   ├── models/
 │   │   │   └── document.py         # SQLAlchemy models
 │   │   └── services/
@@ -265,7 +266,7 @@ python -m pytest tests/ --cov=app --cov-report=html
 | MasterAgent | 97% |
 | **Total** | **69%** |
 
-**162 tests** covering unit, integration, and E2E scenarios.
+**179 tests** covering unit, integration, and E2E scenarios.
 
 ## API Endpoints
 
@@ -325,16 +326,36 @@ python -m pytest tests/ --cov=app --cov-report=html
 | Embeddings | all-MiniLM-L6-v2 |
 | Testing | pytest + pytest-cov |
 
-## Security Notes
+## Security
 
-This is a portfolio project. For production deployment, consider:
+Implemented security measures for production-ready deployment:
 
-- **Rate Limiting**: Add `slowapi` to prevent abuse
-- **Input Validation**: Increase max_length on question field
-- **CORS**: Restrict allowed origins
-- **Authentication**: Add JWT/OAuth2 for API access
-- **Audit Logging**: Log all requests for compliance
-- **Secrets Management**: Use environment variables or a secrets manager
+| Feature | Implementation |
+|---------|---------------|
+| **Rate Limiting** | slowapi: 60/min (health), 10/min (ingest), 30/min (ask) |
+| **Input Validation** | max_length=1000 on question, Pydantic validation |
+| **CORS** | Restrictive via `ALLOWED_ORIGINS` env var |
+| **Security Headers** | X-Content-Type-Options, X-Frame-Options, XSS-protection, HSTS, CSP |
+| **Audit Logging** | Middleware logs all API requests with IP, method, status, duration |
+| **Prompt Injection** | 11 regex patterns for common injection attempts |
+| **Input Sanitization** | Control character removal, whitespace trimming |
+
+### Environment Variables
+
+```bash
+# .env file (never commit to git)
+MINIMAX_API_KEY=your_api_key_here
+ALLOWED_ORIGINS=https://app.example.com  # Comma-separated
+```
+
+### Rate Limit Response
+
+When rate limit is exceeded:
+```json
+{"error": "Rate limit exceeded: 30/minute"}
+```
+
+For detailed documentation, see [docs/security-implementation.md](docs/security-implementation.md).
 
 ## Contributing
 
