@@ -20,7 +20,7 @@ INJECTION_PATTERNS = [
     re.compile(r"javascript\s*:", re.IGNORECASE),
     re.compile(r"ignora\s+(todas|todas\s+las|todas?)\s+(instrucoes|instructions)", re.IGNORECASE),
     re.compile(r"ignore\s+(todas|todas\s+las)\s+(instrucoes|instructions)", re.IGNORECASE),
-    re.compile(r"ignore\s+todas\s+(as\s+)?suas\s+(instrucoes|instructions)", re.IGNORECASE),
+    re.compile(r"ignore\s+todas\s+(as\s+)?suas\s+(instrucoes|instruções|instructions)", re.IGNORECASE),
     re.compile(r"esquece\s+(tudo|everything)", re.IGNORECASE),
     re.compile(r"desconsidera\s+(suas|tus)\s+(instrucoes|instructions)", re.IGNORECASE),
     re.compile(r"voce\s+e\s+(agora|ahora)\s+(um|uma)\s+(diferente|novo)", re.IGNORECASE),
