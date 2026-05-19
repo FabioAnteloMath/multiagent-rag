@@ -328,7 +328,7 @@ python -m pytest tests/ --cov=app --cov-report=html
 
 ## Security
 
-Implemented security measures for production-ready deployment:
+Implemented security measures following OWASP Top 10 guidelines:
 
 | Feature | Implementation |
 |---------|---------------|
@@ -337,8 +337,32 @@ Implemented security measures for production-ready deployment:
 | **CORS** | Restrictive via `ALLOWED_ORIGINS` env var |
 | **Security Headers** | X-Content-Type-Options, X-Frame-Options, XSS-protection, HSTS, CSP |
 | **Audit Logging** | Middleware logs all API requests with IP, method, status, duration |
-| **Prompt Injection** | 11 regex patterns for common injection attempts |
+| **Prompt Injection** | 30 regex patterns (EN/PT/ES) for common injection attempts |
 | **Input Sanitization** | Control character removal, whitespace trimming |
+| **A06 - Vulnerable Components** | GitHub Actions: Safety, Bandit, pip-audit + Dependabot |
+
+### Security Auditing
+
+```bash
+# Install tools
+pip install safety bandit pip-audit
+
+# Run all scans locally
+safety check --file backend/requirements.txt
+bandit -r backend/app
+pip-audit --file backend/requirements.txt
+```
+
+### CI/CD Security Pipeline
+
+The project includes automated security scanning via GitHub Actions:
+
+| Scanner | Purpose | Frequency |
+|---------|---------|-----------|
+| **Safety** | Check requirements.txt for CVEs | Every push |
+| **Bandit** | Static analysis for Python security | Every push |
+| **pip-audit** | Scan installed packages for vulnerabilities | Every push |
+| **Dependabot** | Automated dependency updates | Weekly |
 
 ### Environment Variables
 
