@@ -2,16 +2,24 @@ name: Security Audit
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/security.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/security.yml'
   schedule:
     - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   safety:
     name: Safety Dependency Check
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - name: Checkout code
@@ -23,12 +31,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install safety
+        run: pip install safety
 
       - name: Run Safety Check
-        run: |
-          safety check --file backend/requirements.txt --json --output report.json || true
+        run: safety check --file backend/requirements.txt --json --output report.json || true
 
       - name: Upload report
         uses: actions/upload-artifact@v4
@@ -52,7 +58,7 @@ with open('report.json') as f:
             print(f'  - {item.get(\"package\", \"unknown\")}: {item.get(\"vulnerability\", \"unknown\")}')
     else:
         print('No vulnerabilities found!')
-          "
+            "
           else
             echo "No vulnerabilities found!"
           fi
@@ -60,6 +66,7 @@ with open('report.json') as f:
   bandit:
     name: Bandit Security Scan
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - name: Checkout code
@@ -71,12 +78,10 @@ with open('report.json') as f:
           python-version: '3.11'
 
       - name: Install Bandit
-        run: |
-          pip install bandit
+        run: pip install bandit
 
       - name: Run Bandit
-        run: |
-          bandit -r backend/app -f json -o bandit-report.json || true
+        run: bandit -r backend/app -f json -o bandit-report.json || true
 
       - name: Upload report
         uses: actions/upload-artifact@v4
@@ -94,13 +99,13 @@ with open('report.json') as f:
 import json
 with open('bandit-report.json') as f:
     data = json.load(f)
-                    results = data.get('results', [])
-                    if results:
-                        print(f'Found {len(results)} potential issues:')
-                        for r in results[:5]:
-                            print(f'  - {r.get(\"filename\")}:{r.get(\"line\")} - {r.get(\"issue_text\")}')
-                    else:
-                        print('No issues found!')
+    results = data.get('results', [])
+    if results:
+        print(f'Found {len(results)} potential issues:')
+        for r in results[:5]:
+            print(f'  - {r.get(\"filename\")}:{r.get(\"line\")} - {r.get(\"issue_text\")}')
+    else:
+        print('No issues found!')
             "
           else
             echo "No issues found!"
@@ -109,6 +114,7 @@ with open('bandit-report.json') as f:
   pip-audit:
     name: Pip Audit
     runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
 
     steps:
       - name: Checkout code
@@ -120,12 +126,10 @@ with open('bandit-report.json') as f:
           python-version: '3.11'
 
       - name: Install pip-audit
-        run: |
-          pip install pip-audit
+        run: pip install pip-audit
 
       - name: Run pip-audit
-        run: |
-          pip-audit --file backend/requirements.txt --format=json --output=pip-audit-report.json || true
+        run: pip-audit --file backend/requirements.txt --format=json --output=pip-audit-report.json || true
 
       - name: Upload report
         uses: actions/upload-artifact@v4
@@ -143,13 +147,13 @@ with open('bandit-report.json') as f:
 import json
 with open('pip-audit-report.json') as f:
     data = json.load(f)
-                    if data.get('vulnerabilities'):
-                        vulns = data['vulnerabilities']
-                        print(f'Found {len(vulns)} vulnerabilities:')
-                        for v in vulns:
-                            print(f'  - {v.get(\"name\", \"unknown\")}: {v.get(\"id\", \"unknown\")}')
-                    else:
-                        print('No vulnerabilities found!')
+    if data.get('vulnerabilities'):
+        vulns = data['vulnerabilities']
+        print(f'Found {len(vulns)} vulnerabilities:')
+        for v in vulns:
+            print(f'  - {v.get(\"name\", \"unknown\")}: {v.get(\"id\", \"unknown\")}')
+    else:
+        print('No vulnerabilities found!')
             "
           else
             echo "No vulnerabilities found!"
