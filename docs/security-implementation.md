@@ -339,10 +339,66 @@ python -m pytest tests/unit/test_security_service.py -v
 
 ---
 
-## 11. Future Improvements
+## 11. A06 - Vulnerable Components
+
+### GitHub Actions Security Workflow
+
+```yaml
+# .github/workflows/security.yml
+name: Security Audit
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly
+```
+
+### Scans Performed
+
+| Tool | Purpose | Frequency |
+|------|---------|-----------|
+| **Safety** | Check requirements.txt for known CVEs | Every push |
+| **Bandit** | Static analysis for Python security issues | Every push |
+| **pip-audit** | Scan installed packages for vulnerabilities | Every push |
+
+### Dependabot Configuration
+
+```yaml
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+```
+
+### Local Security Audit
+
+```bash
+# Install tools
+pip install safety bandit pip-audit
+
+# Run all scans
+safety check --file backend/requirements.txt
+bandit -r backend/app
+pip-audit --file backend/requirements.txt
+```
+
+### OWASP Category Mapping
+
+- **A06:2021 - Vulnerable and Outdated Components**
+- Mitigation: Automated scanning + Dependabot updates
+
+---
+
+## 12. Future Improvements
 
 ### High Priority
 
+- [x] **Vulnerable Components**: Add automated CVE scanning (DONE)
 - [ ] **Authentication**: Add JWT/OAuth2 for API access
 - [ ] **Output filtering**: Validate LLM responses for leaks
 
@@ -354,10 +410,10 @@ python -m pytest tests/unit/test_security_service.py -v
 
 ### Low Priority
 
-- [ ] **Security scanning**: Add Bandit for Python
-- [ ] **Dependency audit**: Automated CVE scanning
+- [x] **Security scanning**: Add Bandit for Python (DONE)
+- [x] **Dependency audit**: Automated CVE scanning (DONE)
 
 ---
 
-**Document Version**: 1.0
+**Document Version**: 1.1
 **Repository**: https://github.com/FabioAnteloMath/multiagent-rag

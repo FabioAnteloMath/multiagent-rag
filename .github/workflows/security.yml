@@ -1,0 +1,175 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+
+jobs:
+  safety:
+    name: Safety Dependency Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install safety
+
+      - name: Run Safety Check
+        run: |
+          safety check --file backend/requirements.txt --json --output report.json || true
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: safety-report
+          path: report.json
+          retention-days: 30
+
+      - name: Display summary
+        run: |
+          if [ -f report.json ]; then
+            echo "=== Safety Check Results ==="
+            python -c "
+import json
+with open('report.json') as f:
+    data = json.load(f)
+    if data:
+        print(f'Found {len(data)} vulnerabilities:')
+        for item in data:
+            print(f'  - {item.get(\"package\", \"unknown\")}: {item.get(\"vulnerability\", \"unknown\")}')
+    else:
+        print('No vulnerabilities found!')
+          "
+          else
+            echo "No vulnerabilities found!"
+          fi
+
+  bandit:
+    name: Bandit Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Bandit
+        run: |
+          pip install bandit
+
+      - name: Run Bandit
+        run: |
+          bandit -r backend/app -f json -o bandit-report.json || true
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+      - name: Display summary
+        run: |
+          if [ -f bandit-report.json ]; then
+            echo "=== Bandit Scan Results ==="
+            python -c "
+import json
+with open('bandit-report.json') as f:
+    data = json.load(f)
+                    results = data.get('results', [])
+                    if results:
+                        print(f'Found {len(results)} potential issues:')
+                        for r in results[:5]:
+                            print(f'  - {r.get(\"filename\")}:{r.get(\"line\")} - {r.get(\"issue_text\")}')
+                    else:
+                        print('No issues found!')
+            "
+          else
+            echo "No issues found!"
+          fi
+
+  pip-audit:
+    name: Pip Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pip-audit
+        run: |
+          pip install pip-audit
+
+      - name: Run pip-audit
+        run: |
+          pip-audit --file backend/requirements.txt --format=json --output=pip-audit-report.json || true
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pip-audit-report
+          path: pip-audit-report.json
+          retention-days: 30
+
+      - name: Display summary
+        run: |
+          if [ -f pip-audit-report.json ]; then
+            echo "=== Pip Audit Results ==="
+            python -c "
+import json
+with open('pip-audit-report.json') as f:
+    data = json.load(f)
+                    if data.get('vulnerabilities'):
+                        vulns = data['vulnerabilities']
+                        print(f'Found {len(vulns)} vulnerabilities:')
+                        for v in vulns:
+                            print(f'  - {v.get(\"name\", \"unknown\")}: {v.get(\"id\", \"unknown\")}')
+                    else:
+                        print('No vulnerabilities found!')
+            "
+          else
+            echo "No vulnerabilities found!"
+          fi
+
+  summary:
+    name: Security Summary
+    needs: [safety, bandit, pip-audit]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Display final summary
+        run: |
+          echo "=== Security Audit Summary ==="
+          echo "All security scans completed."
+          echo ""
+          echo "Artifacts available:"
+          echo "  - safety-report: Dependency vulnerabilities"
+          echo "  - bandit-report: Code security issues"
+          echo "  - pip-audit-report: Python package vulnerabilities"
+          echo ""
+          echo "Note: If any scan found issues, please review the reports."
