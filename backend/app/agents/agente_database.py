@@ -4,10 +4,14 @@ from app.agents.base_agent import BaseAgent, AgentResult
 class DatabaseAgent(BaseAgent):
     def __init__(
         self,
-        provider: str = "ollama",
-        model_name: str = "llama3.2:3b",
+        provider: str = "minimax",
+        model_name: str = "MiniMax-M2.7",
         temperature: float = 0.3,
-        system_prompt: str = ""
+        system_prompt: str = "",
+        guidelines: str = "",
+        personality: str = "",
+        response_format: str = "",
+        examples: str = ""
     ):
         super().__init__(
             name="Database Agent",
@@ -16,7 +20,11 @@ class DatabaseAgent(BaseAgent):
             provider=provider,
             model_name=model_name,
             temperature=temperature,
-            system_prompt=system_prompt or "You are an expert in database administration and queries."
+            system_prompt=system_prompt or "You are an expert in database administration and queries.",
+            guidelines=guidelines,
+            personality=personality,
+            response_format=response_format,
+            examples=examples
         )
 
     def execute(self, question: str) -> AgentResult:

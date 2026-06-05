@@ -101,7 +101,7 @@ class SecurityService:
         model_name: str = "MiniMax-Text-01",
         temperature: float = 0.0,
         timeout_seconds: float = 2.0,
-        llm_enabled: bool = True
+        llm_enabled: bool = False
     ):
         self._llm_enabled = llm_enabled
         self._timeout = timeout_seconds

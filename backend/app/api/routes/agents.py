@@ -14,6 +14,10 @@ class AgentResponse(BaseModel):
     name: str
     specialty: str
     system_prompt: str
+    guidelines: str
+    personality: str
+    response_format: str
+    examples: str
     collection_id: Optional[str]
     collection_name: Optional[str]
     provider: str
@@ -30,9 +34,13 @@ class AgentCreate(BaseModel):
     name: str
     specialty: str = ""
     system_prompt: str = ""
+    guidelines: str = ""
+    personality: str = ""
+    response_format: str = ""
+    examples: str = ""
     collection_id: Optional[str] = None
-    provider: str = "ollama"
-    model_name: str = "llama3.2:3b"
+    provider: str = "minimax"
+    model_name: str = "MiniMax-M2.7"
     temperature: float = 0.3
 
 
@@ -40,6 +48,10 @@ class AgentUpdate(BaseModel):
     name: Optional[str] = None
     specialty: Optional[str] = None
     system_prompt: Optional[str] = None
+    guidelines: Optional[str] = None
+    personality: Optional[str] = None
+    response_format: Optional[str] = None
+    examples: Optional[str] = None
     collection_id: Optional[str] = None
     provider: Optional[str] = None
     model_name: Optional[str] = None
@@ -67,9 +79,13 @@ def list_agents(db: Session = Depends(get_db)):
             name=agent.name,
             specialty=agent.specialty or "",
             system_prompt=agent.system_prompt or "",
+            guidelines=agent.guidelines or "",
+            personality=agent.personality or "",
+            response_format=agent.response_format or "",
+            examples=agent.examples or "",
             collection_id=agent.collection_id,
             collection_name=collection_name,
-            provider=agent.provider or "ollama",
+            provider=agent.provider or "minimax",
             model_name=agent.model_name,
             temperature=float(agent.temperature or 0.3),
             is_active=bool(agent.is_active),
@@ -95,6 +111,10 @@ def create_agent(agent_data: AgentCreate, db: Session = Depends(get_db)):
         name=agent_data.name,
         specialty=agent_data.specialty,
         system_prompt=agent_data.system_prompt or default_prompt,
+        guidelines=agent_data.guidelines,
+        personality=agent_data.personality,
+        response_format=agent_data.response_format,
+        examples=agent_data.examples,
         collection_id=agent_data.collection_id,
         provider=agent_data.provider,
         model_name=agent_data.model_name,
@@ -115,9 +135,13 @@ def create_agent(agent_data: AgentCreate, db: Session = Depends(get_db)):
         name=new_agent.name,
         specialty=new_agent.specialty or "",
         system_prompt=new_agent.system_prompt or "",
+        guidelines=new_agent.guidelines or "",
+        personality=new_agent.personality or "",
+        response_format=new_agent.response_format or "",
+        examples=new_agent.examples or "",
         collection_id=new_agent.collection_id,
         collection_name=collection_name,
-        provider=new_agent.provider or "ollama",
+        provider=new_agent.provider or "minimax",
         model_name=new_agent.model_name,
         temperature=float(new_agent.temperature or 0.3),
         is_active=bool(new_agent.is_active),
@@ -141,9 +165,13 @@ def get_agent(agent_id: str, db: Session = Depends(get_db)):
         name=agent.name,
         specialty=agent.specialty or "",
         system_prompt=agent.system_prompt or "",
+        guidelines=agent.guidelines or "",
+        personality=agent.personality or "",
+        response_format=agent.response_format or "",
+        examples=agent.examples or "",
         collection_id=agent.collection_id,
         collection_name=collection_name,
-        provider=agent.provider or "ollama",
+        provider=agent.provider or "minimax",
         model_name=agent.model_name,
         temperature=float(agent.temperature or 0.3),
         is_active=bool(agent.is_active),
@@ -163,6 +191,14 @@ def update_agent(agent_id: str, update: AgentUpdate, db: Session = Depends(get_d
         agent.specialty = update.specialty
     if update.system_prompt is not None:
         agent.system_prompt = update.system_prompt
+    if update.guidelines is not None:
+        agent.guidelines = update.guidelines
+    if update.personality is not None:
+        agent.personality = update.personality
+    if update.response_format is not None:
+        agent.response_format = update.response_format
+    if update.examples is not None:
+        agent.examples = update.examples
     if update.collection_id is not None:
         col = db.query(Collection).filter(Collection.id == update.collection_id).first()
         if not col:
@@ -190,9 +226,13 @@ def update_agent(agent_id: str, update: AgentUpdate, db: Session = Depends(get_d
         name=agent.name,
         specialty=agent.specialty or "",
         system_prompt=agent.system_prompt or "",
+        guidelines=agent.guidelines or "",
+        personality=agent.personality or "",
+        response_format=agent.response_format or "",
+        examples=agent.examples or "",
         collection_id=agent.collection_id,
         collection_name=collection_name,
-        provider=agent.provider or "ollama",
+        provider=agent.provider or "minimax",
         model_name=agent.model_name,
         temperature=float(agent.temperature or 0.3),
         is_active=bool(agent.is_active),

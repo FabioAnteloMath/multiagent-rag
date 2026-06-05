@@ -4,10 +4,14 @@ from app.agents.base_agent import BaseAgent, AgentResult
 class GeneralistAgent(BaseAgent):
     def __init__(
         self,
-        provider: str = "ollama",
-        model_name: str = "llama3.2:3b",
+        provider: str = "minimax",
+        model_name: str = "MiniMax-M2.7",
         temperature: float = 0.3,
-        system_prompt: str = ""
+        system_prompt: str = "",
+        guidelines: str = "",
+        personality: str = "",
+        response_format: str = "",
+        examples: str = ""
     ):
         super().__init__(
             name="Generalist Agent",
@@ -16,7 +20,11 @@ class GeneralistAgent(BaseAgent):
             provider=provider,
             model_name=model_name,
             temperature=temperature,
-            system_prompt=system_prompt or "You are a general technical support assistant."
+            system_prompt=system_prompt or "You are a general technical support assistant.",
+            guidelines=guidelines,
+            personality=personality,
+            response_format=response_format,
+            examples=examples
         )
 
     def execute(self, question: str) -> AgentResult:
@@ -34,12 +42,7 @@ class GeneralistAgent(BaseAgent):
             )
 
         context = self.format_context(docs)
-        prompt = f"""You are a general technical support assistant.
-Use only information from the context to answer. Be objective and cite sources.
-
-Context:\n{context}
-
-Question: {question}"""
+        prompt = self.get_system_prompt(question, context)
 
         try:
             llm = self._get_llm()

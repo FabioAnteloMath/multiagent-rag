@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -67,6 +68,15 @@ class IndexManager:
             vectorstore = FAISS.from_documents(documents=all_chunks, embedding=embeddings)
             vectorstore.save_local(str(index_dir))
 
+            # Mark every chunk of every document in this collection as indexed
+            doc_ids = [doc.id for doc in docs]
+            for doc_id in doc_ids:
+                db.query(Chunk).filter(
+                    Chunk.document_id == doc_id,
+                    Chunk.embedding_status == "pending",
+                ).update({"embedding_status": "indexed"}, synchronize_session=False)
+            db.commit()
+
             return {
                 "success": True,
                 "collection": collection.name,
@@ -81,14 +91,28 @@ class IndexManager:
 
     def rebuild_document_index(self, document_id: str) -> dict:
         """Rebuild FAISS index for a single document's collection."""
+        from app.models import Collection
+        
         db = SessionLocal()
         try:
             doc = db.query(DocModel).filter(DocModel.id == document_id).first()
             if not doc:
                 return {"success": False, "error": "Document not found"}
 
+            # Create default collection if none exists
             if not doc.collection_id:
-                return {"success": False, "error": "Document has no collection"}
+                default_col = db.query(Collection).filter(Collection.name == "default").first()
+                if not default_col:
+                    default_col = Collection(
+                        id=f"col_{os.urandom(8).hex()}",
+                        name="default",
+                        description="Default collection"
+                    )
+                    db.add(default_col)
+                    db.commit()
+                    db.refresh(default_col)
+                doc.collection_id = default_col.id
+                db.commit()
 
             return self.rebuild_collection_index(doc.collection_id)
 

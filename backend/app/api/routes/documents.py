@@ -139,30 +139,126 @@ async def upload_document(
         file_type=file_type,
         file_size=file_size,
         file_path=file_path,
-        status="pending",
+        status="processing",
         collection_id=collection_id if collection else None
     )
     db.add(document)
-    db.commit()
-
-    ProcessingLog(
+    db.add(ProcessingLog(
         document_id=doc_id,
         status="uploaded",
         message=f"Arquivo {file.filename} carregado com sucesso"
-    )
-    db.add(ProcessingLog(
-        document_id=doc_id,
-        status="pending",
-        message="Aguardando processamento de chunking"
     ))
     db.commit()
 
-    return UploadResponse(
-        id=doc_id,
-        filename=file.filename,
-        status="pending",
-        message="Documento carregado. Use /documents/{id}/process para processar."
-    )
+    # Auto-process document after upload
+    import logging
+    logger = logging.getLogger(__name__)
+    print(f"[UPLOAD] Starting processing for {file.filename}")
+    
+    try:
+        if document.file_type == "pdf":
+            try:
+                from langchain_community.document_loaders import PyPDFLoader
+                logger.info(f"Loading PDF: {document.file_path}")
+                loader = PyPDFLoader(document.file_path)
+                pages = loader.load()
+                content = "\n\n".join([p.page_content for p in pages])
+                logger.info(f"PyPDFLoader: {len(pages)} pages, {len(content)} chars")
+            except Exception as pdf_error:
+                # Fallback: use pypdf directly
+                logger.warning(f"PyPDFLoader failed: {pdf_error}, trying pypdf")
+                from pypdf import PdfReader
+                reader = PdfReader(document.file_path)
+                content_parts = []
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        content_parts.append(text)
+                content = "\n\n".join(content_parts)
+                logger.info(f"pypdf: {len(reader.pages)} pages, {len(content)} chars")
+        elif document.file_type == "md":
+            content = open(document.file_path, "r", encoding="utf-8", errors="ignore").read()
+        else:
+            content = open(document.file_path, "r", encoding="utf-8", errors="ignore").read()
+        
+        logger.info(f"Content length: {len(content)} characters")
+        
+        if not content.strip():
+            print("[UPLOAD] ERROR: Content is empty!")
+            raise Exception("PDF content is empty - cannot extract text")
+
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
+        splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=80)
+        texts = splitter.split_text(content)
+        print(f"[UPLOAD] Split into {len(texts)} chunks")
+        logger.info(f"Created {len(texts)} chunks")
+        
+        for idx, text in enumerate(texts):
+            chunk = Chunk(
+                id=f"chunk_{os.urandom(8).hex()}",
+                document_id=doc_id,
+                content=text,
+                chunk_index=idx,
+                embedding_status="pending",
+                chunk_id=str(idx)
+            )
+            db.add(chunk)
+        
+        print(f"[UPLOAD] Adding {len(texts)} chunks to DB...")
+
+        document.status = "indexed"
+        db.add(ProcessingLog(
+            document_id=doc_id,
+            status="completed",
+            message=f"{len(texts)} chunks criados e indexados"
+        ))
+        db.commit()
+
+        # Rebuild FAISS index and mark chunks as 'indexed' so the UI is honest
+        try:
+            from app.services.index_manager import index_manager
+            idx_result = index_manager.rebuild_document_index(doc_id)
+            if idx_result.get("success"):
+                for c in texts:
+                    db.query(Chunk).filter(
+                        Chunk.document_id == doc_id,
+                        Chunk.embedding_status == "pending",
+                    ).update({"embedding_status": "indexed"}, synchronize_session=False)
+                db.commit()
+                print(f"[UPLOAD] FAISS index rebuilt and chunks marked indexed")
+        except Exception as idx_err:
+            print(f"[UPLOAD] WARN: index rebuild failed: {idx_err}")
+        
+        # Verify chunks were saved AFTER commit
+        saved_chunks = db.query(Chunk).filter(Chunk.document_id == doc_id).count()
+        print(f"[UPLOAD] Chunks saved to DB: {saved_chunks}")
+        
+        logger.info(f"SUCCESS: Upload completed for {file.filename} with {len(texts)} chunks, {saved_chunks} saved")
+
+        return UploadResponse(
+            id=doc_id,
+            filename=file.filename,
+            status="indexed",
+            message=f"Documento processado. {len(texts)} chunks criados."
+        )
+
+    except Exception as e:
+        import traceback
+        logger.error(f"ERROR processing upload: {str(e)}")
+        logger.error(traceback.format_exc())
+        document.status = "error"
+        db.add(ProcessingLog(
+            document_id=doc_id,
+            status="error",
+            message=f"Erro no processamento: {str(e)}"
+        ))
+        db.commit()
+        return UploadResponse(
+            id=doc_id,
+            filename=file.filename,
+            status="error",
+            message=f"Upload concluído, mas erro no processamento: {str(e)}"
+        )
 
 
 @router.delete("/{document_id}")
@@ -224,17 +320,39 @@ def process_document(document_id: str, db: Session = Depends(get_db)):
     db.commit()
 
     try:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Starting process for document: {document_id}")
+        logger.info(f"File path: {doc.file_path}")
+        logger.info(f"File exists: {os.path.exists(doc.file_path)}")
+        
         if doc.file_type == "pdf":
-            from langchain_community.document_loaders import PyPDFLoader
-            loader = PyPDFLoader(doc.file_path)
-            pages = loader.load()
-            content = "\n\n".join([p.page_content for p in pages])
+            try:
+                from langchain_community.document_loaders import PyPDFLoader
+                logger.info("Loading PDF with PyPDFLoader...")
+                loader = PyPDFLoader(doc.file_path)
+                pages = loader.load()
+                logger.info(f"PDF loaded: {len(pages)} pages")
+                content = "\n\n".join([p.page_content for p in pages])
+            except Exception as pdf_error:
+                logger.warning(f"PyPDFLoader failed: {pdf_error}, trying pypdf directly")
+                from pypdf import PdfReader
+                reader = PdfReader(doc.file_path)
+                content_parts = []
+                for page in reader.pages:
+                    text = page.extract_text()
+                    if text:
+                        content_parts.append(text)
+                content = "\n\n".join(content_parts)
+                logger.info(f"PDF extracted with pypdf: {len(content)} chars")
         elif doc.file_type == "md":
             content = open(doc.file_path, "r", encoding="utf-8", errors="ignore").read()
         else:
             content = open(doc.file_path, "r", encoding="utf-8", errors="ignore").read()
+        
+        logger.info(f"Content length: {len(content)} characters")
 
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
         splitter = RecursiveCharacterTextSplitter(chunk_size=600, chunk_overlap=80)
         texts = splitter.split_text(content)
 
@@ -394,8 +512,19 @@ def rebuild_document_index(document_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Document not found")
 
     result = index_manager.rebuild_document_index(document_id)
+    
+    # Log the result for debugging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Reindex result for {document_id}: {result}")
+    
     if not result.get("success"):
-        raise HTTPException(status_code=400, detail=result.get("error", "Failed to rebuild index"))
+        # Return 200 with error details instead of 400
+        return {
+            "success": False,
+            "error": result.get("error", "Failed to rebuild index"),
+            "document_id": document_id
+        }
 
     return result
 

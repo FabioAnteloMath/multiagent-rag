@@ -27,10 +27,14 @@ class BaseAgent(ABC):
         name: str,
         category: str,
         collection_name: str,
-        provider: str = "ollama",
-        model_name: str = "llama3.2:3b",
+        provider: str = "minimax",
+        model_name: str = "MiniMax-M2.7",
         temperature: float = 0.3,
-        system_prompt: str = ""
+        system_prompt: str = "",
+        guidelines: str = "",
+        personality: str = "",
+        response_format: str = "",
+        examples: str = ""
     ):
         self.name = name
         self.category = category
@@ -39,6 +43,10 @@ class BaseAgent(ABC):
         self.model_name = model_name
         self.temperature = temperature
         self._system_prompt = system_prompt
+        self._guidelines = guidelines
+        self._personality = personality
+        self._response_format = response_format
+        self._examples = examples
         self._vectorstore = None
         self._embeddings = None
         self._llm = None
@@ -101,10 +109,41 @@ class BaseAgent(ABC):
         self._vectorstore = self._load_vectorstore()
 
     def get_system_prompt(self, question: str, context: str) -> str:
-        """Generate the system prompt for this agent"""
-        return f"""You are {self.name}, a specialist in {self.category}.
-Use only information from the provided context to answer. Be objective and cite sources when applicable.
+        """Generate the system prompt for this agent with full customization"""
+        parts = []
 
-Context:\n{context}
+        if self._system_prompt:
+            parts.append(self._system_prompt)
+        else:
+            parts.append(f"You are {self.name}, a specialist in {self.category}.")
 
-Question: {question}"""
+        parts.append("Use only information from the provided context to answer.")
+
+        if hasattr(self, '_guidelines') and self._guidelines:
+            parts.append(f"\nGuidelines:\n{self._guidelines}")
+
+        if hasattr(self, '_personality') and self._personality:
+            parts.append(f"\nPersonality: {self._personality}")
+
+        if hasattr(self, '_response_format') and self._response_format:
+            parts.append(f"\nResponse Format: {self._response_format}")
+
+        if hasattr(self, '_examples') and self._examples:
+            parts.append(f"\nExamples:\n{self._examples}")
+
+        parts.append(f"\nContext:\n{context}")
+        parts.append(f"\nQuestion: {question}")
+
+        return "\n\n".join(parts)
+
+    def set_guidelines(self, guidelines: str):
+        self._guidelines = guidelines
+
+    def set_personality(self, personality: str):
+        self._personality = personality
+
+    def set_response_format(self, format: str):
+        self._response_format = format
+
+    def set_examples(self, examples: str):
+        self._examples = examples
