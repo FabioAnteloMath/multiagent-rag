@@ -33,6 +33,10 @@ export interface Agent {
   name: string;
   specialty: string;
   system_prompt: string;
+  guidelines: string;
+  personality: string;
+  response_format: string;
+  examples: string;
   collection_id: string | null;
   collection_name: string | null;
   provider: string;
@@ -201,7 +205,19 @@ export async function getAgents(): Promise<Agent[]> {
   return res.json();
 }
 
-export async function createAgent(data: { name: string; specialty?: string; collection_id?: string; provider?: string; model_name?: string; temperature?: number }): Promise<Agent> {
+export async function createAgent(data: {
+  name: string;
+  specialty?: string;
+  collection_id?: string;
+  provider?: string;
+  model_name?: string;
+  temperature?: number;
+  system_prompt?: string;
+  guidelines?: string;
+  personality?: string;
+  response_format?: string;
+  examples?: string;
+}): Promise<Agent> {
   const res = await fetch(`${API_BASE}/agents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -219,7 +235,20 @@ export async function deleteAgent(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete agent');
 }
 
-export async function updateAgent(id: string, data: { name?: string; specialty?: string; collection_id?: string; provider?: string; model_name?: string; temperature?: number; is_active?: boolean }): Promise<Agent> {
+export async function updateAgent(id: string, data: {
+  name?: string;
+  specialty?: string;
+  collection_id?: string;
+  provider?: string;
+  model_name?: string;
+  temperature?: number;
+  is_active?: boolean;
+  system_prompt?: string;
+  guidelines?: string;
+  personality?: string;
+  response_format?: string;
+  examples?: string;
+}): Promise<Agent> {
   const res = await fetch(`${API_BASE}/agents/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -259,4 +288,66 @@ export async function rebuildDocumentIndex(documentId: string): Promise<{ succes
   } as RequestInit);
   if (!res.ok) throw new Error('Failed to rebuild index');
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Provider / model catalog
+// ---------------------------------------------------------------------------
+
+export interface ProviderSpec {
+  id: string;
+  name: string;
+  models: string[];
+  free: boolean;
+  notes: string;
+}
+
+export const PROVIDER_CATALOG: ProviderSpec[] = [
+  {
+    id: "ollama",
+    name: "Ollama (Local)",
+    free: true,
+    notes: "Local, no cost. Models you have pulled with `ollama pull`.",
+    models: [
+      "llama3.2:3b",
+      "llama3.2:1b",
+      "llama3.1:8b",
+      "mistral:7b",
+      "qwen2.5:1.5b",
+      "qwen2.5:7b",
+      "phi3:mini",
+      "gemma2:2b",
+      "codellama:7b",
+    ],
+  },
+  {
+    id: "minimax",
+    name: "MiniMax (Cloud)",
+    free: false,
+    notes: "Primary cloud model. Requires MINIMAX_API_KEY.",
+    models: ["MiniMax-M2.7", "MiniMax-M2.7-highspeed"],
+  },
+  {
+    id: "groq",
+    name: "Groq (Cloud, free tier)",
+    free: true,
+    notes: "Ultra-fast inference. Free tier ~30 req/min. Needs GROQ_API_KEY.",
+    models: [
+      "llama-3.1-8b-instant",
+      "llama-3.3-70b-versatile",
+      "mixtral-8x7b-32768",
+      "gemma2-9b-it",
+    ],
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini (Cloud, free tier)",
+    free: true,
+    notes: "Free tier rate-limited. Needs GEMINI_API_KEY.",
+    models: ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"],
+  },
+];
+
+export function getProviderSpec(providerId: string): ProviderSpec | undefined {
+  return PROVIDER_CATALOG.find((p) => p.id === providerId);
 }

@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getDocuments, uploadDocument, deleteDocument, processDocument, type Document } from "@/lib/api";
 
-const statusColors: Record<string, string> = {
-    pending: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-    processing: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-    indexed: "bg-green-500/20 text-green-400 border-green-500/30",
-    error: "bg-red-500/20 text-red-400 border-red-500/30",
+const statusColors: Record<string, { bg: string; text: string }> = {
+    pending: { bg: "bg-amber-50", text: "text-amber-600" },
+    processing: { bg: "bg-blue-50", text: "text-blue-600" },
+    indexed: { bg: "bg-emerald-50", text: "text-emerald-600" },
+    error: { bg: "bg-red-50", text: "text-red-600" },
 };
 
 export default function DocumentsPage() {
+    const router = useRouter();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [loading, setLoading] = useState(true);
     const [uploading, setUploading] = useState(false);
@@ -39,14 +40,13 @@ export default function DocumentsPage() {
             await loadDocuments();
         } catch (error) {
             console.error("Failed to upload:", error);
-            alert("Error uploading document");
         } finally {
             setUploading(false);
         }
     }
 
     async function handleDelete(id: string) {
-        if (!confirm("Are you sure you want to delete?")) return;
+        if (!confirm("Delete this document?")) return;
         try {
             await deleteDocument(id);
             await loadDocuments();
@@ -77,11 +77,11 @@ export default function DocumentsPage() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Documents</h1>
-                    <p className="text-slate-400 mt-1">Manage your support documents</p>
+                    <h1 className="text-2xl font-semibold text-slate-900">Documents</h1>
+                    <p className="text-slate-500 mt-1">Manage your support documents</p>
                 </div>
                 <label className="cursor-pointer">
                     <input
@@ -90,106 +90,92 @@ export default function DocumentsPage() {
                         className="hidden"
                         onChange={handleFileSelect}
                     />
-                    <span className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                        {uploading ? "Uploading..." : "+ Upload Document"}
+                    <span className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors font-medium text-sm">
+                        {uploading ? "Uploading..." : "+ Upload"}
                     </span>
                 </label>
             </div>
 
             <div
                 className={`border-2 border-dashed rounded-xl p-8 mb-8 text-center transition-colors ${
-                    dragOver ? "border-blue-500 bg-blue-500/10" : "border-slate-700 hover:border-slate-600"
+                    dragOver ? "border-blue-400 bg-blue-50" : "border-slate-200 hover:border-slate-300"
                 }`}
-                onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                }}
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
             >
-                <div className="text-slate-400">
-                    <p className="text-lg mb-2">Drag files here or click Upload</p>
-                    <p className="text-sm">Formats: PDF, MD, TXT</p>
+                <div className="text-slate-500">
+                    <p className="text-base mb-1">Drag files here or click Upload</p>
+                    <p className="text-sm">PDF, MD, TXT</p>
                 </div>
             </div>
 
             {loading ? (
                 <div className="text-center py-12 text-slate-400">Loading...</div>
             ) : documents.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                    No documents found. Upload a file to get started.
+                <div className="text-center py-12 text-slate-500 bg-white rounded-xl border border-slate-200">
+                    No documents found
                 </div>
             ) : (
-                <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                     <table className="w-full">
-                        <thead className="bg-slate-800 border-b border-slate-700">
-                            <tr>
-                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Name
-                                </th>
-                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Type
-                                </th>
-                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Status
-                                </th>
-                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Chunks
-                                </th>
-                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Date
-                                </th>
-                                <th className="text-right px-6 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">
-                                    Actions
-                                </th>
+                        <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200">
+                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
+                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
+                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Chunks</th>
+                                <th className="text-left px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
+                                <th className="text-right px-6 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-700">
-                            {documents.map((doc) => (
-                                <tr key={doc.id} className="hover:bg-slate-700/30">
-                                    <td className="px-6 py-4">
-                                        <Link href={`/chunks/${doc.id}`} className="text-white font-medium hover:text-blue-400 transition-colors">
-                                            {doc.filename}
-                                        </Link>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="text-slate-400 uppercase text-sm">{doc.file_type}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full border ${statusColors[doc.status] || statusColors.pending}`}>
-                                            {doc.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-400">{doc.chunks_count}</td>
-                                    <td className="px-6 py-4 text-slate-400 text-sm">
-                                        {new Date(doc.upload_date).toLocaleDateString("en-US")}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Link
-                                                href={`/chunks/${doc.id}`}
-                                                className="text-purple-400 hover:text-purple-300 text-sm px-2 py-1"
-                                            >
-                                                Chunks
-                                            </Link>
-                                            {doc.status !== "indexed" && (
+                        <tbody className="divide-y divide-slate-100">
+                            {documents.map((doc) => {
+                                const colors = statusColors[doc.status] || statusColors.pending;
+                                return (
+                                    <tr key={doc.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <span className="text-slate-900 font-medium">{doc.filename}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="text-slate-500 uppercase text-sm">{doc.file_type}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}>
+                                                {doc.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500">{doc.chunks_count}</td>
+                                        <td className="px-6 py-4 text-slate-500 text-sm">
+                                            {new Date(doc.upload_date).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center justify-end gap-3">
                                                 <button
-                                                    onClick={() => handleProcess(doc.id)}
-                                                    className="text-blue-400 hover:text-blue-300 text-sm px-2 py-1"
+                                                    onClick={() => router.push(`/documents/${doc.id}/chunks`)}
+                                                    className="text-purple-600 hover:text-purple-700 text-sm font-medium"
                                                 >
-                                                    Process
+                                                    Edit Chunks
                                                 </button>
-                                            )}
-                                            <button
-                                                onClick={() => handleDelete(doc.id)}
-                                                className="text-red-400 hover:text-red-300 text-sm px-2 py-1"
-                                            >
-                                                Delete
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
+                                                {doc.status !== "indexed" && (
+                                                    <button
+                                                        onClick={() => handleProcess(doc.id)}
+                                                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                                                    >
+                                                        Process
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => handleDelete(doc.id)}
+                                                    className="text-red-500 hover:text-red-600 text-sm font-medium"
+                                                >
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

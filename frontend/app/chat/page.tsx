@@ -11,7 +11,6 @@ interface Message {
     agent_used?: string[];
     steps?: string[];
     timestamp: Date;
-    needs_clarifying?: boolean;
     tokens_used?: number;
     thinking?: string;
     model_used?: string;
@@ -20,107 +19,165 @@ interface Message {
     collection_searched?: string;
 }
 
-const agentColors: Record<string, string> = {
-    "API Support Agent": "bg-blue-500/20 text-blue-400",
-    "Database Agent": "bg-green-500/20 text-green-400",
-    "DevOps Agent": "bg-purple-500/20 text-purple-400",
-    "Generalist Agent": "bg-slate-500/20 text-slate-400",
-    "baseline": "bg-slate-500/20 text-slate-400",
+const agentConfig: Record<string, { bg: string; border: string; text: string; dot: string; icon: JSX.Element }> = {
+    // English names
+    "API Support Agent": { 
+        bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-600", dot: "bg-blue-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+    },
+    "Database Agent": { 
+        bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-600", dot: "bg-emerald-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
+    },
+    "DevOps Agent": { 
+        bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-600", dot: "bg-purple-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+    },
+    "Generalist Agent": { 
+        bg: "bg-slate-100", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+    },
+    "baseline": { 
+        bg: "bg-slate-100", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+    },
+    // Portuguese names
+    "Agente Suporte API": { 
+        bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-600", dot: "bg-blue-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+    },
+    "Agente Database": { 
+        bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-600", dot: "bg-emerald-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
+    },
+    "Agente DevOps": { 
+        bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-600", dot: "bg-purple-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" /></svg>
+    },
+    "Agente Generalista": { 
+        bg: "bg-slate-100", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-500",
+        icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+    },
 };
 
-const defaultAgentColor = "bg-slate-500/20 text-slate-400";
-
-const baselineInfo = {
-    title: "Baseline Mode",
-    icon: "📊",
-    description: "Simple vector search + LLM response without agent delegation. Uses a single FAISS index containing all documents.",
-    useCases: [
-        "Performance comparison - measure multi-agent gains",
-        "Fallback if agents fail",
-        "Simple benchmark baseline",
-    ],
-};
-
-const masterAgentInfo = {
-    title: "MasterAgent Mode",
-    icon: "🎯",
-    description: "Intelligent routing that classifies your question and delegates to specialized agents running in parallel.",
-    howItWorks: [
-        { step: "1. Classify", desc: "LLM determines which knowledge areas are relevant" },
-        { step: "2. Delegate", desc: "Selected agents search their collection-specific indexes" },
-        { step: "3. Aggregate", desc: "Responses from all agents are combined" },
-    ],
-    agents: [
-        { name: "API Support Agent", color: "text-blue-400", icon: "🔧", docs: "HTTP errors, authentication, JWT, gateway" },
-        { name: "Database Agent", color: "text-green-400", icon: "🗄️", docs: "Postgres, Redis, queries, cache" },
-        { name: "DevOps Agent", color: "text-purple-400", icon: "🚀", docs: "Deploy, rollback, CI/CD, monitoring" },
-        { name: "Generalist Agent", color: "text-slate-400", icon: "🤖", docs: "General questions, fallback" },
-    ],
-};
-
-const singleRagInfo = {
-    title: "Single RAG Mode",
-    icon: "🎯",
-    description: "Classifies your question and routes to ONE best-matching specialized agent. Returns a single clean answer from the selected collection.",
-    howItWorks: [
-        { step: "1. Classify", desc: "LLM determines which single knowledge area is most relevant" },
-        { step: "2. Search", desc: "Only the selected collection is searched" },
-        { step: "3. Answer", desc: "A single response is generated from one agent" },
-    ],
-    benefits: [
-        "Cleaner responses (no conflicting answers)",
-        "Faster execution (single agent)",
-        "Easier to debug",
-        "Lower token usage",
-    ],
-};
-
-function getDisplayContent(msg: Message): { agentName: string; content: string } {
-    if (msg.agent_used && msg.agent_used.length > 0) {
-        return { agentName: "MasterAgent", content: msg.content };
-    }
-    return { agentName: msg.agent_used?.[0] || "MasterAgent", content: msg.content };
-}
+const defaultConfig = { bg: "bg-slate-100", border: "border-slate-200", text: "text-slate-600", dot: "bg-slate-500", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> };
 
 function formatTime(ms: number): string {
     if (ms < 1000) return `${Math.round(ms)}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
 }
 
-function renderContent(text: string): string {
-    return text
-        .replace(/^### (.*$)/gim, '<h3 class="text-lg font-semibold text-white mt-4 mb-2">$1</h3>')
-        .replace(/^## (.*$)/gim, '<h2 class="text-xl font-semibold text-white mt-4 mb-2">$1</h2>')
-        .replace(/^# (.*$)/gim, '<h1 class="text-2xl font-bold text-white mt-4 mb-2">$1</h1>')
-        .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white font-semibold">$1</strong>')
-        .replace(/\*(.*?)\*/g, '<em class="text-slate-300">$1</em>')
-        .replace(/^- (.*$)/gim, '<li class="text-slate-300 ml-4 list-none">• $1</li>')
-        .replace(/^(\d+)\. (.*$)/gim, '<li class="text-slate-300 ml-4 list-none">$1. $2</li>')
-        .replace(/\|(.*?)\|/g, (match) => {
-            const cells = match.split('|').filter(c => c.trim());
-            return `<div class="flex border-b border-slate-600 py-1"><span class="flex-1 text-slate-300">${cells.join('</span><span class="flex-1 text-slate-300">')}</span></div>`;
-        })
+function renderMarkdown(text: string): string {
+    // Escape HTML first
+    let html = text
+        .replace(/&/g, '&')
+        .replace(/</g, '<')
+        .replace(/>/g, '>');
+    
+    // Code blocks with syntax highlighting appearance
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        return `<div class="my-3 rounded-lg overflow-hidden border border-slate-200 bg-slate-900">
+            <div class="bg-slate-800 px-3 py-1.5 flex items-center gap-2 border-b border-slate-700">
+                <span class="text-xs text-slate-400 font-mono">${lang || 'code'}</span>
+                <div class="flex gap-1.5 ml-auto">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                </div>
+            </div>
+            <pre class="p-4 text-sm text-slate-100 overflow-x-auto font-mono leading-relaxed"><code>${code.trim()}</code></pre>
+        </div>`;
+    });
+    
+    // Inline code
+    html = html.replace(/`([^`]+)`/g, '<code class="bg-slate-100 text-blue-600 px-1.5 py-0.5 rounded text-sm font-mono">$1</code>');
+    
+    // Headers - h1 (large, gradient)
+    html = html.replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold text-slate-800 mt-4 mb-2 flex items-center gap-2"><span class="w-1 h-1 bg-purple-500 rounded-full"></span>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold text-slate-900 mt-5 mb-3 flex items-center gap-2"><span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mt-6 mb-3">$1</h1>');
+    
+    // Bold and italic
+    html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong class="font-bold text-slate-900">$1</strong>');
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-800">$1</strong>');
+    html = html.replace(/\*(.*?)\*/g, '<em class="text-slate-600">$1</em>');
+    
+    // Horizontal rule as separator
+    html = html.replace(/^---$/gm, '<div class="my-4 border-t border-slate-200"></div>');
+    html = html.replace(/^---$/gm, '<hr class="my-4 border-slate-200" />');
+    
+    // Tables with styling
+    const tableRegex = /\|(.+)\|\n\|[-:\s|]+\|\n((?:\|.+\|\n?)+)/g;
+    html = html.replace(tableRegex, (match, header, body) => {
+        const headers = header.split('|').filter(h => h.trim()).map(h => `<th class="px-4 py-2 text-left text-sm font-semibold text-slate-700 bg-slate-50 border-b border-slate-200">${h.trim()}</th>`).join('');
+        const rows = body.trim().split('\n').map(row => {
+            const cells = row.split('|').filter(c => c !== undefined).map((c, i) => `<td class="px-4 py-2 text-sm text-slate-600 border-b border-slate-100 ${i === 0 ? '' : ''}">${c.trim()}</td>`).join('');
+            return `<tr class="${row.index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}">${cells}</tr>`;
+        }).join('');
+        return `<div class="my-4 rounded-lg overflow-hidden border border-slate-200"><table class="w-full text-sm"><thead>${headers}</thead><tbody>${rows}</tbody></table></div>`;
+    });
+    
+    // Lists
+    html = html.replace(/^- (.*$)/gim, '<li class="text-slate-700 ml-4 mb-1 flex items-start gap-3"><span class="text-blue-500 mt-0.5">▹</span>$1</li>');
+    html = html.replace(/^(\d+)\. (.*$)/gim, '<li class="text-slate-700 ml-4 mb-1 flex items-start gap-3"><span class="text-blue-500 font-medium min-w-[1.5rem]">$1.</span>$2</li>');
+    
+    // Blockquotes with icon
+    html = html.replace(/^> (.+)$/gm, '<blockquote class="my-3 pl-4 border-l-4 border-blue-400 bg-blue-50 py-2 rounded-r"><span class="text-blue-400 mr-2">💡</span><span class="text-slate-700">$1</span></blockquote>');
+    
+    // Process paragraphs
+    html = html
         .split('\n\n')
         .map(p => p.trim())
         .filter(p => p)
         .map(p => {
-            if (p.startsWith('<h') || p.startsWith('<li')) {
-                return p;
-            }
-            return `<p class="text-slate-200 mb-3 leading-relaxed">${p.replace(/\n/g, '<br/>')}</p>`;
+            if (p.startsWith('<h') || p.startsWith('<li') || p.startsWith('<div') || p.startsWith('<table') || p.startsWith('<blockquote') || p.startsWith('<hr')) return p;
+            if (p.startsWith('<ul>')) return p;
+            if (p.startsWith('<ol>')) return p;
+            if (p.startsWith('<pre>')) return p;
+            return `<p class="text-slate-700 mb-3 leading-relaxed">${p.replace(/\n/g, '<br/>')}</p>`;
         })
         .join('');
+    
+    // Wrap loose list items in ul
+    const lines = html.split('\n');
+    const result: string[] = [];
+    let inList = false;
+    let listContent = '';
+    
+    for (const line of lines) {
+        if (line.startsWith('<li')) {
+            if (!inList) {
+                if (listContent) result.push(listContent);
+                listContent = '<ul class="my-3 space-y-1">';
+                inList = true;
+            }
+            listContent += line;
+        } else {
+            if (inList) {
+                listContent += '</ul>';
+                result.push(listContent);
+                listContent = '';
+                inList = false;
+            }
+            result.push(line);
+        }
+    }
+    if (inList && listContent) {
+        listContent += '</ul>';
+        result.push(listContent);
+    }
+    
+    return result.join('\n');
 }
 
 export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
-    const [mode, setMode] = useState<"baseline" | "auto" | "single_rag">("auto");
+    const [mode, setMode] = useState<"auto" | "single_rag">("single_rag");
     const [forceAgent, setForceAgent] = useState<string>("");
     const [loading, setLoading] = useState(false);
     const [apiOnline, setApiOnline] = useState(false);
-    const [showInfo, setShowInfo] = useState<"baseline" | "masteragent" | "single_rag" | null>(null);
-    const [expandedMeta, setExpandedMeta] = useState<string | null>(null);
+    const [showDetails, setShowDetails] = useState<string | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -142,13 +199,18 @@ export default function ChatPage() {
         }
     }
 
+    const MIN_QUESTION_LENGTH = 3;
+    const trimmedInput = input.trim();
+    const inputTooShort = trimmedInput.length > 0 && trimmedInput.length < MIN_QUESTION_LENGTH;
+    const canSend = trimmedInput.length >= MIN_QUESTION_LENGTH && !loading;
+
     async function handleSend() {
-        if (!input.trim() || loading) return;
+        if (!canSend) return;
 
         const userMessage: Message = {
             id: Date.now().toString(),
             role: "user",
-            content: input.trim(),
+            content: trimmedInput,
             timestamp: new Date(),
         };
 
@@ -158,7 +220,7 @@ export default function ChatPage() {
 
         try {
             const response: AskResponse = await askQuestion(
-                input.trim(),
+                trimmedInput,
                 4,
                 mode,
                 forceAgent || undefined
@@ -172,7 +234,6 @@ export default function ChatPage() {
                 agent_used: response.agent_used,
                 steps: response.steps,
                 timestamp: new Date(),
-                needs_clarifying: response.needs_clarifying,
                 tokens_used: response.tokens_used,
                 thinking: response.thinking,
                 model_used: response.model_used,
@@ -186,7 +247,7 @@ export default function ChatPage() {
             const errorMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 role: "assistant",
-                content: "Error processing response. Try again.",
+                content: (error as Error).message || "Erro desconhecido. Verifique se o backend esta rodando.",
                 timestamp: new Date(),
             };
             setMessages((prev) => [...prev, errorMessage]);
@@ -202,328 +263,197 @@ export default function ChatPage() {
         }
     }
 
+    function getAgentStyle(agentName: string) {
+        return agentConfig[agentName] || defaultConfig;
+    }
+
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] max-w-5xl mx-auto px-4">
-            <div className="flex items-center justify-between py-4 border-b border-slate-700">
-                <div className="flex items-center gap-4">
-                    <span className={`flex items-center gap-2 text-sm ${apiOnline ? "text-green-400" : "text-red-400"}`}>
-                        <span className={`w-2 h-2 rounded-full ${apiOnline ? "bg-green-500" : "bg-red-500"}`} />
-                        {apiOnline ? "API Online" : "API Offline"}
-                    </span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-400 mr-2">Mode:</span>
-                    <button
-                        onClick={() => setMode("baseline")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            mode === "baseline"
-                                ? "bg-slate-600 text-white"
-                                : "bg-slate-700 text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        Baseline
-                    </button>
-                    <button
-                        onClick={() => setMode("auto")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            mode === "auto"
-                                ? "bg-blue-600 text-white"
-                                : "bg-slate-700 text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        MasterAgent
-                    </button>
-                    <button
-                        onClick={() => setMode("single_rag")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            mode === "single_rag"
-                                ? "bg-emerald-600 text-white"
-                                : "bg-slate-700 text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        Single RAG
-                    </button>
-                    <button
-                        onClick={() => setShowInfo(showInfo ? null : mode === "baseline" ? "baseline" : mode === "single_rag" ? "single_rag" : "masteragent")}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            showInfo ? "bg-amber-600 text-white" : "bg-slate-700 text-slate-400 hover:text-white"
-                        }`}
-                    >
-                        ?
-                    </button>
+        <div className="flex flex-col h-[calc(100vh-64px)]">
+            <div className="bg-white border-b border-slate-200 px-4 py-3">
+                <div className="max-w-4xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <span className={`flex items-center gap-2 text-sm ${apiOnline ? "text-emerald-600" : "text-red-500"}`}>
+                            <span className={`w-2 h-2 rounded-full ${apiOnline ? "bg-emerald-500" : "bg-red-500"}`} />
+                            {apiOnline ? "Connected" : "Disconnected"}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value as typeof mode)}
+                            className="bg-slate-100 border-0 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="single_rag">Single RAG</option>
+                            <option value="auto">Multi-Agent</option>
+                        </select>
+                        {(mode === "auto" || mode === "single_rag") && (
+                            <select
+                                value={forceAgent}
+                                onChange={(e) => setForceAgent(e.target.value)}
+                                className="bg-slate-100 border-0 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                                <option value="">Auto Route</option>
+                                <option value="suporte_api">API Support</option>
+                                <option value="database">Database</option>
+                                <option value="devops">DevOps</option>
+                            </select>
+                        )}
+                    </div>
                 </div>
             </div>
 
-            {showInfo && showInfo === "baseline" && (
-                <div className="bg-slate-800/70 border border-slate-600 rounded-xl p-5 mb-4">
-                    <div className="flex items-start gap-4">
-                        <span className="text-3xl">{baselineInfo.icon}</span>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-2">{baselineInfo.title}</h3>
-                            <p className="text-slate-300 text-sm mb-3">{baselineInfo.description}</p>
-                            <div className="flex flex-wrap gap-2">
-                                {baselineInfo.useCases.map((use, idx) => (
-                                    <span key={idx} className="inline-flex items-center gap-1 bg-slate-700/50 px-3 py-1 rounded-full text-xs text-slate-300">
-                                        {use}
-                                    </span>
-                                ))}
+            <div className="flex-1 overflow-y-auto">
+                <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+                    {messages.length === 0 && (
+                        <div className="text-center py-16">
+                            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                </svg>
                             </div>
+                            <h2 className="text-xl font-semibold text-slate-900 mb-2">Start a conversation</h2>
+                            <p className="text-slate-500">Ask questions about your technical documentation</p>
                         </div>
-                        <button
-                            onClick={() => setShowInfo(null)}
-                            className="text-slate-500 hover:text-white transition-colors"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                </div>
-            )}
+                    )}
 
-            {showInfo && showInfo === "masteragent" && (
-                <div className="bg-slate-800/70 border border-slate-600 rounded-xl p-5 mb-4">
-                    <div className="flex items-start gap-4 mb-4">
-                        <span className="text-3xl">{masterAgentInfo.icon}</span>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-2">{masterAgentInfo.title}</h3>
-                            <p className="text-slate-300 text-sm">{masterAgentInfo.description}</p>
-                        </div>
-                        <button
-                            onClick={() => setShowInfo(null)}
-                            className="text-slate-500 hover:text-white transition-colors"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                        {masterAgentInfo.agents.map((agent) => (
-                            <div key={agent.name} className="bg-slate-700/50 rounded-lg p-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span>{agent.icon}</span>
-                                    <span className={`text-sm font-medium ${agent.color}`}>{agent.name}</span>
-                                </div>
-                                <p className="text-xs text-slate-400">{agent.docs}</p>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="border-t border-slate-600 pt-3">
-                        <p className="text-xs text-slate-400 mb-2">How it works:</p>
-                        <div className="flex flex-wrap gap-3">
-                            {masterAgentInfo.howItWorks.map((item) => (
-                                <div key={item.step} className="flex items-center gap-2">
-                                    <span className="text-blue-400 text-sm font-medium">{item.step}</span>
-                                    <span className="text-slate-300 text-xs">{item.desc}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
+                    {messages.map((msg) => {
+                        const isUser = msg.role === "user";
+                        const agentName = msg.agent_used?.[0] || "Assistant";
+                        const agentStyle = getAgentStyle(agentName);
 
-            {showInfo && showInfo === "single_rag" && (
-                <div className="bg-slate-800/70 border border-slate-600 rounded-xl p-5 mb-4">
-                    <div className="flex items-start gap-4 mb-4">
-                        <span className="text-3xl">{singleRagInfo.icon}</span>
-                        <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-white mb-2">{singleRagInfo.title}</h3>
-                            <p className="text-slate-300 text-sm">{singleRagInfo.description}</p>
-                        </div>
-                        <button
-                            onClick={() => setShowInfo(null)}
-                            className="text-slate-500 hover:text-white transition-colors"
-                        >
-                            ✕
-                        </button>
-                    </div>
-                    <div className="border-t border-slate-600 pt-3 mb-3">
-                        <p className="text-xs text-slate-400 mb-2">How it works:</p>
-                        <div className="flex flex-wrap gap-3">
-                            {singleRagInfo.howItWorks.map((item) => (
-                                <div key={item.step} className="flex items-center gap-2">
-                                    <span className="text-emerald-400 text-sm font-medium">{item.step}</span>
-                                    <span className="text-slate-300 text-xs">{item.desc}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        {singleRagInfo.benefits.map((benefit) => (
-                            <span key={benefit} className="inline-flex items-center gap-1 bg-emerald-600/20 text-emerald-400 px-3 py-1 rounded-full text-xs">
-                                ✓ {benefit}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {(mode === "auto" || mode === "single_rag") && !showInfo && (
-                <div className="py-3 border-b border-slate-700">
-                    <div className="flex items-center gap-3">
-                        <label className="text-sm text-slate-400">Force Agent:</label>
-                        <select
-                            value={forceAgent}
-                            onChange={(e) => setForceAgent(e.target.value)}
-                            className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
-                        >
-                            <option value="">Auto (MasterAgent)</option>
-                            <option value="suporte_api">API Support Agent</option>
-                            <option value="database">Database Agent</option>
-                            <option value="devops">DevOps Agent</option>
-                        </select>
-                    </div>
-                </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto py-4 space-y-4">
-                {messages.length === 0 && (
-                    <div className="text-center text-slate-500 py-12">
-                        <div className="text-4xl mb-4">💬</div>
-                        <p className="text-lg mb-2">Welcome to Support Copilot</p>
-                        <p className="text-sm">
-                            Select a mode and start asking questions
-                        </p>
-                    </div>
-                )}
-
-                {messages.map((msg) => {
-                    const { agentName, content } = msg.role === "assistant" ? getDisplayContent(msg) : { agentName: "", content: msg.content };
-
-                    return (
-                        <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                            <div
-                                className={`max-w-[90%] rounded-2xl px-5 py-4 ${
-                                    msg.role === "user"
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-slate-800 border border-slate-700"
-                                }`}
-                            >
-                                {msg.role === "assistant" && (
-                                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-700">
-                                        <span className={`inline-flex px-3 py-1 text-xs font-medium rounded-full ${agentColors[agentName] || defaultAgentColor}`}>
-                                            {agentName}
-                                        </span>
-                                        {msg.confidence !== undefined && (
-                                            <span className="text-xs text-slate-500">
-                                                confidence: {(msg.confidence * 100).toFixed(0)}%
+                        return (
+                            <div key={msg.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                                <div
+                                    className={`max-w-[85%] rounded-2xl px-5 py-4 ${
+                                        isUser
+                                            ? "bg-blue-500 text-white"
+                                            : "bg-white border border-slate-200 shadow-sm"
+                                    }`}
+                                >
+                                    {!isUser && msg.agent_used && (
+                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${agentStyle.bg} ${agentStyle.border} ${agentStyle.text}`}>
+                                                <span className={`w-1.5 h-1.5 rounded-full ${agentStyle.dot}`} />
+                                                {agentName}
                                             </span>
+                                            {msg.confidence !== undefined && (
+                                                <span className="text-xs text-slate-400">
+                                                    {Math.round(msg.confidence * 100)}% confidence
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <div className={isUser ? "text-white" : "text-slate-700"}>
+                                        {isUser ? (
+                                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                                        ) : (
+                                            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
                                         )}
                                     </div>
-                                )}
 
-                                <div className="text-slate-100 leading-relaxed">
-                                    {msg.role === "user" ? (
-                                        <p className="whitespace-pre-wrap">{content}</p>
-                                    ) : (
-                                        <div dangerouslySetInnerHTML={{ __html: renderContent(content) }} />
+                                    {!isUser && (
+                                        <div className="mt-3 pt-3 border-t border-slate-100">
+                                            <div className="flex items-center justify-between">
+                                                <button
+                                                    onClick={() => setShowDetails(showDetails === msg.id ? null : msg.id)}
+                                                    className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    {showDetails === msg.id ? "Hide" : "Show"} details
+                                                </button>
+                                                <span className="text-xs text-slate-400">
+                                                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+
+                                            {showDetails === msg.id && (
+                                                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
+                                                    {msg.sources && msg.sources.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            <span className="text-slate-500">Sources:</span>
+                                                            {msg.sources.map((s, i) => (
+                                                                <span key={i} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                                    {s.split('/').pop()}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    {msg.tokens_used !== undefined && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-slate-500">Tokens:</span>
+                                                            <span className="text-slate-700 font-mono">{msg.tokens_used}</span>
+                                                        </div>
+                                                    )}
+                                                    {msg.model_used && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-slate-500">Model:</span>
+                                                            <span className="text-slate-700 font-mono">{msg.model_used}</span>
+                                                        </div>
+                                                    )}
+                                                    {msg.total_time_ms !== undefined && (
+                                                        <div className="flex justify-between">
+                                                            <span className="text-slate-500">Response time:</span>
+                                                            <span className="text-slate-700 font-mono">{formatTime(msg.total_time_ms)}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
+                            </div>
+                        );
+                    })}
 
-                                {msg.role === "assistant" && (
-                                    <div className="mt-3 pt-3 border-t border-slate-700/50 space-y-2">
-                                        {msg.sources && msg.sources.length > 0 && (
-                                            <div className="text-xs">
-                                                <span className="text-slate-400 font-medium">Sources: </span>
-                                                <span className="text-slate-500">{msg.sources.join(", ")}</span>
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-center justify-between">
-                                            <button
-                                                onClick={() => setExpandedMeta(expandedMeta === msg.id ? null : msg.id)}
-                                                className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                                            >
-                                                {expandedMeta === msg.id ? "▼" : "▶"} Details
-                                            </button>
-                                            <span className="text-xs text-slate-500">
-                                                {msg.timestamp.toLocaleTimeString("en-US")}
-                                            </span>
-                                        </div>
-
-                                        {expandedMeta === msg.id && (
-                                            <div className="bg-slate-900/50 rounded-lg p-3 mt-2 space-y-2 text-xs">
-                                                {msg.tokens_used !== undefined && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-slate-400">Tokens used:</span>
-                                                        <span className="text-white font-mono">{msg.tokens_used}</span>
-                                                    </div>
-                                                )}
-                                                {msg.model_used && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-slate-400">Model:</span>
-                                                        <span className="text-white font-mono">{msg.model_used}</span>
-                                                    </div>
-                                                )}
-                                                {msg.total_time_ms !== undefined && (
-                                                    <div className="flex justify-between">
-                                                        <span className="text-slate-400">Response time:</span>
-                                                        <span className="text-white font-mono">{formatTime(msg.total_time_ms)}</span>
-                                                    </div>
-                                                )}
-                                                {msg.thinking && (
-                                                    <div className="mt-2 pt-2 border-t border-slate-700">
-                                                        <span className="text-slate-400 block mb-1">Thinking process:</span>
-                                                        <span className="text-slate-300 font-mono text-xs whitespace-pre-wrap">{msg.thinking}</span>
-                                                    </div>
-                                                )}
-                                                {msg.steps && msg.steps.length > 0 && (
-                                                    <div className="flex justify-between mt-1">
-                                                        <span className="text-slate-400">Pipeline steps:</span>
-                                                        <span className="text-blue-300 font-mono">{msg.steps.join(" → ")}</span>
-                                                    </div>
-                                                )}
-                                                {msg.collection_searched && (
-                                                    <div className="flex justify-between mt-1">
-                                                        <span className="text-slate-400">Collection searched:</span>
-                                                        <span className="text-emerald-400 font-mono">{msg.collection_searched}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                    {loading && (
+                        <div className="flex justify-start">
+                            <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4 shadow-sm">
+                                <div className="flex items-center gap-3 text-slate-500">
+                                    <div className="flex gap-1">
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                        <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                                     </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-
-                {loading && (
-                    <div className="flex justify-start">
-                        <div className="bg-slate-800 rounded-2xl px-5 py-4">
-                            <div className="flex items-center gap-3 text-slate-400">
-                                <div className="flex gap-1">
-                                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                    <span className="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                                    <span className="text-sm">Thinking...</span>
                                 </div>
-                                <span className="text-sm">Thinking...</span>
                             </div>
                         </div>
-                    </div>
-                )}
+                    )}
 
-                <div ref={messagesEndRef} />
+                    <div ref={messagesEndRef} />
+                </div>
             </div>
 
-            <div className="py-4 border-t border-slate-700">
-                <div className="flex items-center gap-3">
-                    <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyPress}
-                        placeholder="Type your question..."
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 resize-none"
-                        rows={1}
-                    />
-                    <button
-                        onClick={handleSend}
-                        disabled={!input.trim() || loading}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-medium rounded-2xl transition-colors"
-                    >
-                        Send
-                    </button>
+            <div className="bg-white border-t border-slate-200 px-4 py-4">
+                <div className="max-w-4xl mx-auto">
+                    <div className="flex items-center gap-3 bg-slate-100 rounded-2xl px-4 py-2">
+                        <textarea
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyPress}
+                            placeholder="Type your question..."
+                            className="flex-1 bg-transparent text-slate-900 placeholder-slate-400 focus:outline-none resize-none py-1"
+                            rows={1}
+                        />
+                        <button
+                            onClick={handleSend}
+                            disabled={!canSend}
+                            className="p-2 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-300 text-white rounded-xl transition-colors"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2 text-center">
+                        {inputTooShort
+                            ? `Faltam ${MIN_QUESTION_LENGTH - trimmedInput.length} caractere${MIN_QUESTION_LENGTH - trimmedInput.length > 1 ? "s" : ""} (minimo ${MIN_QUESTION_LENGTH})`
+                            : "Press Enter to send, Shift+Enter for new line"}
+                    </p>
                 </div>
-                <p className="text-xs text-slate-500 mt-2 text-center">
-                    Press Enter to send, Shift+Enter for new line
-                </p>
             </div>
         </div>
     );

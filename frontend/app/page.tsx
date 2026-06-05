@@ -2,101 +2,90 @@ import Link from "next/link";
 
 export default function Home() {
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="text-center mb-12">
-                <h1 className="text-4xl font-bold text-white mb-4">
-                    Multiagent RAG - Support Copilot
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div className="text-center mb-16">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-full text-sm font-medium mb-6">
+                    <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                    AI-Powered Technical Support
+                </div>
+                <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4 tracking-tight">
+                    Support Copilot
                 </h1>
-                <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-                    Technical support system with RAG, specialized multi-agents, and document management
+                <p className="text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
+                    Intelligent technical support system with multi-agent routing.
+                    Get accurate answers from your documentation in seconds.
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+                <Link
+                    href="/chat"
+                    className="group bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg hover:border-blue-200 transition-all duration-300"
+                >
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900 mb-2">Chat</h2>
+                    <p className="text-slate-600 text-sm">
+                        Ask questions and get answers from specialized agents
+                    </p>
+                </Link>
+
                 <Link
                     href="/documents"
-                    className="group bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-blue-500 transition-all"
+                    className="group bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg hover:border-emerald-200 transition-all duration-300"
                 >
-                    <div className="text-3xl mb-3">📄</div>
-                    <h2 className="text-xl font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
-                        Documents
-                    </h2>
-                    <p className="text-slate-400 text-sm">
-                        Upload, view, and manage documents
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900 mb-2">Documents</h2>
+                    <p className="text-slate-600 text-sm">
+                        Upload and manage your support documentation
                     </p>
                 </Link>
 
                 <Link
                     href="/collections"
-                    className="group bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-purple-500 transition-all"
+                    className="group bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg hover:border-purple-200 transition-all duration-300"
                 >
-                    <div className="text-3xl mb-3">📚</div>
-                    <h2 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-400 transition-colors">
-                        Collections
-                    </h2>
-                    <p className="text-slate-400 text-sm">
+                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900 mb-2">Collections</h2>
+                    <p className="text-slate-600 text-sm">
                         Organize documents by knowledge area
-                    </p>
-                </Link>
-
-                <Link
-                    href="/agents"
-                    className="group bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-green-500 transition-all"
-                >
-                    <div className="text-3xl mb-3">🤖</div>
-                    <h2 className="text-xl font-semibold text-white mb-2 group-hover:text-green-400 transition-colors">
-                        Agents
-                    </h2>
-                    <p className="text-slate-400 text-sm">
-                        Specialized agents for knowledge areas
-                    </p>
-                </Link>
-
-                <Link
-                    href="/chat"
-                    className="group bg-slate-800 border border-slate-700 rounded-xl p-6 hover:border-amber-500 transition-all"
-                >
-                    <div className="text-3xl mb-3">💬</div>
-                    <h2 className="text-xl font-semibold text-white mb-2 group-hover:text-amber-400 transition-colors">
-                        Chat
-                    </h2>
-                    <p className="text-slate-400 text-sm">
-                        Chat with the copilot using Baseline or Multi-agent
                     </p>
                 </Link>
             </div>
 
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6">
-                <h2 className="text-xl font-semibold text-white mb-4">About the Project</h2>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div>
-                        <h3 className="text-blue-400 font-medium mb-2">Tech Stack</h3>
-                        <ul className="text-slate-400 text-sm space-y-1">
-                            <li>Backend: FastAPI + SQLAlchemy + SQLite</li>
-                            <li>Frontend: Next.js 14 + Tailwind</li>
-                            <li>RAG: LangChain + LangGraph</li>
-                            <li>Vector Store: FAISS / ChromaDB</li>
-                            <li>LLM: Ollama (llama3.2:3b)</li>
-                        </ul>
+            <div className="bg-white border border-slate-200 rounded-2xl p-8">
+                <h2 className="text-2xl font-semibold text-slate-900 mb-6">How it works</h2>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div className="text-center">
+                        <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-3">1</div>
+                        <h3 className="font-medium text-slate-900 mb-1">Upload Documents</h3>
+                        <p className="text-sm text-slate-600">Add PDF, MD, or TXT files to your knowledge base</p>
                     </div>
-                    <div>
-                        <h3 className="text-purple-400 font-medium mb-2">Features</h3>
-                        <ul className="text-slate-400 text-sm space-y-1">
-                            <li>Document management</li>
-                            <li>Collections for organization</li>
-                            <li>Specialized agents</li>
-                            <li>Toggle Baseline vs Multi-agent</li>
-                            <li>Source citations</li>
-                        </ul>
+                    <div className="text-center">
+                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-3">2</div>
+                        <h3 className="font-medium text-slate-900 mb-1">Organize</h3>
+                        <p className="text-sm text-slate-600">Group documents into collections by topic</p>
                     </div>
-                    <div>
-                        <h3 className="text-green-400 font-medium mb-2">How to Use</h3>
-                        <ul className="text-slate-400 text-sm space-y-1">
-                            <li>1. Upload documents at /documents</li>
-                            <li>2. Create collections to organize</li>
-                            <li>3. Configure specialized agents</li>
-                            <li>4. Use chat to ask questions</li>
-                        </ul>
+                    <div className="text-center">
+                        <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-3">3</div>
+                        <h3 className="font-medium text-slate-900 mb-1">Ask</h3>
+                        <p className="text-sm text-slate-600">Chat with the copilot using natural language</p>
+                    </div>
+                    <div className="text-center">
+                        <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-lg font-bold mx-auto mb-3">4</div>
+                        <h3 className="font-medium text-slate-900 mb-1">Get Answers</h3>
+                        <p className="text-sm text-slate-600">Receive accurate answers with source citations</p>
                     </div>
                 </div>
             </div>
