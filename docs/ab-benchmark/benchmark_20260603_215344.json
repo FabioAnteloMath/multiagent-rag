@@ -1,0 +1,214 @@
+{
+  "started_at": "2026-06-03T21:53:44.143310",
+  "questions": [
+    {
+      "id": "Q1",
+      "label": "Factual (HyDE)",
+      "question": "O que e HyDE e qual problema ele resolve em RAG?"
+    },
+    {
+      "id": "Q2",
+      "label": "Comparative (RAG tiers)",
+      "question": "Compare Naive RAG, Advanced RAG e Modular RAG em uma frase cada."
+    },
+    {
+      "id": "Q3",
+      "label": "Recommendation (production stack)",
+      "question": "Para um RAG em producao com time de 2 devs, qual stack voce recomenda?"
+    }
+  ],
+  "models": [
+    {
+      "provider": "minimax",
+      "model_name": "MiniMax-M2.7",
+      "temperature": 0.3,
+      "max_tokens": 500
+    },
+    {
+      "provider": "ollama",
+      "model_name": "qwen2.5:1.5b",
+      "temperature": 0.3,
+      "max_tokens": 500
+    },
+    {
+      "provider": "ollama",
+      "model_name": "llama3.2:3b",
+      "temperature": 0.3,
+      "max_tokens": 500
+    }
+  ],
+  "results": {
+    "Q1": {
+      "question": "O que e HyDE e qual problema ele resolve em RAG?",
+      "label": "Factual (HyDE)",
+      "models": {
+        "minimax:MiniMax-M2.7": {
+          "provider": "minimax",
+          "model_name": "MiniMax-M2.7",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "The user is asking about HyDE (Hypothetical Document Embeddings) based on the context provided. They've shared a technical document about RAG techniques. Let me provide a clear, technical explanation of HyDE and the problem it solves.\n\nFrom the document excerpt:\n- \"Problema: a query do usuário (pergunta) tem distribuição diferente dos documentos (respostas). O retrieval mede distância entre query e doc — mas 'como cancelar?' e 'Procedimento para cancelamento de assinatura: passo...\" \n\nThe text seems cut off but the idea is clear: there's a distribution mismatch between how users ask questions and how documents are written (which are often in answer format).\n\n\nThis is a common problem in RAG systems where queries and documents have different linguistic distributions. HyDE addresses this by having an LLM generate a hypothetical document answering the query, then embedding that synthetic document for similarity search instead of the original user query itself. This approach works because it transforms the query into a format that better matches the document space.\n\n\n# HyDE: Hypothetical Document Embeddings\n\n## O Problema Solucionado\n\nHyDE resolve o **distribution mismatch** entre queries e documentos.\n\nA premissa central de RAG é que retrieval encontra documentos relevantes medindo similaridade no espaço de embeddings. O problema é:\n\n| Tipo | Exemplo |\n|------|---------|\n| **Query do usuário** | \"como cancelar assinatura?\" |\n| **Documento do corpus** | \"Procedimento de cancelamento: passo a passo...\" |\n\nSão registros linguísticos com estruturas **ortogonais**: pergunta vs. resposta/instrução. Isso degrada a qualidade do retrieval, mesmo com embeddings state-of-the-art.\n\n---\n\n## Como Funciona\n\n```\n┌─────────────┐    LLM       ┌──────────────────────────────────┐\n│  Query real │ ──────────►  │ Gerar documento hipotético       │\n│             │               │ \"Para cancelar assinatura,       │\n│\"como        │               │  acesse Configurações > Conta >  │\n│ cancelar?\"  │               │  Cancelar...\"                   │\n└─────────────┘               └────────────┬───────────────────┘\n                                           │\n                                     embedding\n                                           │\n                        ┌──────────────────▼──────────────────┐\n                        │  Semântica do documento gerado      │\n                        │  é mais próxima do corpus real      │\n                        │  do que a query original           │\n                        └────────────┬────────────────────────",
+          "answer_chars": 2574,
+          "latency_ms": 6632.3,
+          "prompt_tokens": 604,
+          "completion_tokens": 500,
+          "total_tokens": 1104,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 29.8878915309906
+        },
+        "ollama:qwen2.5:1.5b": {
+          "provider": "ollama",
+          "model_name": "qwen2.5:1.5b",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "HyDE (Hypothetical Document Embeddings) é um conceito que surge como uma solução para o problema de distribuição diferente entre a query do usuário e os documentos de resposta no context of Retrieval-Augmented Generation (RAG). \n\nO HyDE resolve esse problema através da criação de embeddings hipotéticos dos documentos. Isso ocorre porque, na prática, as distribuições das queries e dos documentos são diferentes. O retrieval mede a distância entre a query e os documentos, mas não tem uma maneira clara de \"cancelar\" ou \"procedimento para cancelamento de assinatura\".\n\nEntão, o HyDE resolve esse problema criando embeddings hipotéticos dos documentos que estão fora do espaço da distribuição real das queries. Isso permite que a distância entre a query e os documentos seja medida corretamente, mesmo quando essas distâncias são diferentes.\n\nEm outras palavras, ao criar os embeddings hipotéticos, o HyDE \"cancela\" ou \"reduz\" a diferença de distribuição entre as queries e os documentos, tornando possível uma avaliação mais precisa do relevante na base da distância. Isso é especialmente útil em contextos onde há muitas informações não relacionadas (como em RAG), pois permite que sejam identificadas e eliminadas essas distorções.\n\nA principal vantagem de HyDE é a capacidade de lidar com o problema de distribuição diferente entre as queries e os documentos, tornando possível uma avaliação mais precisa do relevante na base da distância.",
+          "answer_chars": 1443,
+          "latency_ms": 48776.8,
+          "prompt_tokens": 362,
+          "completion_tokens": 220,
+          "total_tokens": 582,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 52.381622076034546
+        },
+        "ollama:llama3.2:3b": {
+          "provider": "ollama",
+          "model_name": "llama3.2:3b",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "HyDE (Hypothetical Document Embeddings) é uma técnica desenvolvida para resolver um problema específico no pipeline de RAG (Retrieval-Augmented Generation), conhecido como \"distribuição desigual entre a query e os documentos\" (Section 0.4.1).\n\nO problema que HyDE resolve é o seguinte: quando a query do usuário tem uma distribuição diferente dos documentos (respostas), o retrieval tradicional, que mede a distância entre a query e os documentos, não é eficaz para encontrar as respostas mais relevantes.\n\nA ideia de HyDE é criar uma representação de documentos hipotéticos, ou seja, como se os documentos fossem respondas a perguntas diferentes da original. Isso permite que o retrieval seja realizado em um espaço de dados mais uniforme, reduzindo a influência da distribuição desigual entre a query e os documentos.\n\nEm outras palavras, HyDE tenta \"cancelar\" a distribuição desigual entre a query e os documentos, permitindo que o RAG seja mais eficaz em encontrar as respostas mais relevantes mesmo quando a query não está na mesma direção dos documentos.\n\nA implementação de HyDE envolve criar uma representação de documentos hipotéticos utilizando técnicas de aprendizado de máquina, como por exemplo, a utilização de modelos de representação de texto (e.g., BERT) e técnicas de processamento de linguagem natural (NLP).\n\nEm resumo, HyDE é uma técnica que ajuda a resolver o problema da distribuição desigual entre a query e os documentos no pipeline de RAG, permitindo que o RAG seja mais eficaz em encontrar as respostas mais relevantes mesmo quando a query não está na mesma direção dos documentos.\n\nReferências:\n\n* [HyDE: Hypothetical Document Embeddings](https://arxiv.org/abs/2102.08321)\n* [Retrieval-Augmented Generation: A Survey](https://arxiv.org/abs/2201.08623)\n\nFonte: \"Técnicas Avançadas\" do livro \"RAG: Uma Abordagem para a Geração de Texto com Retorno de Busca\"",
+          "answer_chars": 1883,
+          "latency_ms": 137077.1,
+          "prompt_tokens": 362,
+          "completion_tokens": 277,
+          "total_tokens": 639,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 140.27412796020508
+        }
+      }
+    },
+    "Q2": {
+      "question": "Compare Naive RAG, Advanced RAG e Modular RAG em uma frase cada.",
+      "label": "Comparative (RAG tiers)",
+      "models": {
+        "minimax:MiniMax-M2.7": {
+          "provider": "minimax",
+          "model_name": "MiniMax-M2.7",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "The user is asking me to compare Naive RAG, Advanced RAG, and Modular RAG in one sentence each. Let me craft concise, technically precise sentences based on the context provided.\n\nFrom the context:\n- Naive RAG: Low complexity, baseline approach\n- Advanced RAG: Medium complexity, typically includes re-ranking and other improvements\n- Modular RAG: High complexity, allows loops and adaptive retrieval (like CRAG)\n\nLet me write three distinct sentences.\n\n\n\n**Naive RAG** é o baseline de baixa complexidade: recupera os chunks mais similares e passa tudo ao LLM, confiando que ele filtrará o irrelevante.\n\n**Advanced RAG** adiciona camadas intermédias (re-ranker, query expansion, re-phrasing) para melhorar a qualidade da recuperação antes da geração, sem alterar a arquitetura sequencial.\n\n**Modular RAG** decompõe o pipeline em módulos intercambiáveis — retrieval, generation, validation, feedback — permitindo loops adaptativos (como CRAG) onde o sistema pede mais retrieval se o validador detectar insuficiência de contexto.",
+          "answer_chars": 1027,
+          "latency_ms": 4569.9,
+          "prompt_tokens": 631,
+          "completion_tokens": 225,
+          "total_tokens": 856,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 7.667802333831787
+        },
+        "ollama:qwen2.5:1.5b": {
+          "provider": "ollama",
+          "model_name": "qwen2.5:1.5b",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "Naive RAG é um modelo baseado apenas na leitura de documentos para gerar respostas, sem consideração para a qualidade do contexto ou fontes. Advanced RAG, por outro lado, utiliza técnicas avançadas como re-ranking e métricas de avaliação para melhorar a precisão das respostas, mas ainda não possui uma estratégia eficaz para garantir que o contexto seja suficiente. Modular RAG, finalmente, incorpora estratégias de correção automatizada (CRAG) para lidar com situações onde as respostas possam ter fontes ou contextos insuficientes, tornando-se um modelo mais robusto e eficaz em termos de precisão e consistência.",
+          "answer_chars": 616,
+          "latency_ms": 26342.0,
+          "prompt_tokens": 370,
+          "completion_tokens": 92,
+          "total_tokens": 462,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 29.58185124397278
+        },
+        "ollama:llama3.2:3b": {
+          "provider": "ollama",
+          "model_name": "llama3.2:3b",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "Claro! Aqui estão as comparações em frases:\n\n*   **Naive RAG**: É um baseline simples que utiliza apenas a geração de texto para resolver problemas de RAG.\n*   **Advanced RAG**: Utiliza re-ranking para melhorar os resultados da Naive RAG, tornando-o mais eficiente quando necessário.\n*   **Modular RAG**: Permite escalabilidade e flexibilidade adicionais, utilizando loops para solicitar mais pesquisa quando necessário, tornando-se uma opção mais robusta.\n\nFonte: Documentação do RAGAS (Retrieval-Augmented Generation)",
+          "answer_chars": 519,
+          "latency_ms": 49851.2,
+          "prompt_tokens": 370,
+          "completion_tokens": 70,
+          "total_tokens": 440,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 53.288044452667236
+        }
+      }
+    },
+    "Q3": {
+      "question": "Para um RAG em producao com time de 2 devs, qual stack voce recomenda?",
+      "label": "Recommendation (production stack)",
+      "models": {
+        "minimax:MiniMax-M2.7": {
+          "provider": "minimax",
+          "model_name": "MiniMax-M2.7",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "The user is asking me for a RAG stack recommendation for a production RAG system with a team of just 2 developers. They've provided context about RAG production considerations, including cost implications and the golden rules.\n\nLet me think about this systematically for a small team:\n\n**Key constraints for 2-dev team:**\n1. Limited bandwidth for infrastructure management\n2. Need for reliability/stability over cutting-edge\n3. Cost sensitivity\n4. Need for quick iteration\n5. Can't afford complex multi-agent systems\n\n**Recommended stack considerations:**\n\nFor **embedding models**:\n- Cloud-hosted (OpenAI text-embedding-3 or Cohere) - low ops burden\n- Avoid self-hosted unless team has ML infra experience\n\nFor **vector store**:\n- Managed services: Pinecone, Weaviate Cloud, Qdrant Cloud, or Azure AI Search\n- Avoid self-hosted Elasticsearch/Milvus unless necessary\n\nFor **LLM**:\n- Managed API: GPT-4o, Claude 3.5 Sonnet\n- Consider caching layer\n\nFor **RAG framework**:\n- LangChain/LlamaIndex for flexibility\n- Or simpler: custom orchestration for low complexity\n\nFor **chunking**:\n- Semantic chunking with overlap\n- Avoid complex recursive character splitting unless needed\n\nFor **cache**:\n- Redis for query caching\n- Potentially semantic cache\n\nFor **monitoring**:\n- LangSmith, Phoenix, or custom metrics to Prometheus\n\n**My recommendation for 2-dev team:**\n\n1. **Embedding**: OpenAI text-embedding-3-small or Cohere\n2. **Vector DB**: Pinecone Serverless or Qdrant Cloud\n3. **LLM**: Claude 3.5 Sonnet or GPT-4o (with fallback)\n4. **Orchestration**: LangChain or LlamaIndex (avoid over-engineering)\n5. **Cache**: Redis\n6. **Monitoring**: LangSmith or custom Prometheus/Grafana\n\n\n7. **Document processing**: Unstructured.io or custom PDF parsing\n\nI should structure this as a clear, practical recommendation that reflects the production realities they're dealing with.\n\n\n\n# Stack RAG para Produção com 2 Devs\n\nPara um time enxuto, a prioridade é **minimizar operacional** e maximizar **confiabilidade**. Stack recomendada:\n\n## Stack Recomendada\n\n| Camada | Opção Primária | Alternativa |\n|--------|---------------|-------------|\n| **Embedding** | Open",
+          "answer_chars": 2152,
+          "latency_ms": 12828.7,
+          "prompt_tokens": 662,
+          "completion_tokens": 500,
+          "total_tokens": 1162,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 16.075305223464966
+        },
+        "ollama:qwen2.5:1.5b": {
+          "provider": "ollama",
+          "model_name": "qwen2.5:1.5b",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "Para uma implementação em produção com um time de dois desenvolvedores, é recomendável optar por um modelo de pipeline fixo (1 LLM call) ou um sistema que pode lidar com até três chamadas a modelos LLM. Isso garante que você tenha o melhor dos mundos: alta eficiência e qualidade em situações onde os dados são estáveis e as perguntas são simples.\n\nAlém disso, é importante considerar a escalabilidade e a manutenibilidade do sistema. Uma abordagem multi-agente com até cinco agentes pode ser adequada para complexas workflows que requerem interações mútuas entre diferentes agências, mas isso geralmente leva a um custo significativo devido à necessidade de várias chamadas a modelos LLM.\n\nEm termos de tecnologia, você pode considerar:\n\n- **Pipeline fixo (1 LLM call)**: Para situações onde os dados são estáveis e as perguntas são simples.\n- **Advanced RAG (2–3 LLM calls)**: Para cenários onde há uma grande diversidade de dados ou complexidades nas respostas, mas ainda é possível manter a qualidade com poucas chamadas.\n- **Multi-agente com iteração (5–15 calls)**: Para situações mais complexas que exigem interações mútuas entre diferentes agências e onde o custo pode ser maior.\n\nPor fim, lembre-se de implementar uma estratégia de manutenção eficaz para garantir a qualidade do serviço em tempo real. Isso pode incluir testes contínuos, monitoramento dos recursos da infraestrutura, e atualizações regulares do modelo LLM.\n\nQuanto ao custo relativo, é importante lembrar que os modelos de RAG são geralmente mais baratos do que os modelos de conversação baseados em IA. Portanto, mesmo se o custo inicial for maior, a economia na manutenção e escalabilidade pode compensar ao longo do tempo.\n\nPor fim, lembre-se que o melhor caminho depende da realidade específica do seu projeto, incluindo os dados disponíveis, as expectativas de qualidade dos usuários, e a estrutura atual da sua infraestrutura.",
+          "answer_chars": 1908,
+          "latency_ms": 59782.8,
+          "prompt_tokens": 364,
+          "completion_tokens": 299,
+          "total_tokens": 663,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 62.92568802833557
+        },
+        "ollama:llama3.2:3b": {
+          "provider": "ollama",
+          "model_name": "llama3.2:3b",
+          "temperature": 0.3,
+          "max_tokens": 500,
+          "answer": "Para um RAG em produção com um time de 2 desenvolvedores, eu recomendaria uma abordagem escalável e flexível. Considerando o custo relativo e a complexidade do projeto, aqui estão algumas opções:\n\n1. **Stack base**: Utilize uma plataforma de LLM como Hugging Face Transformers ou Meta AI's T5, que oferecem uma ampla gama de modelos pré-treinados e uma interface fácil de usar para integração com o RAG.\n2. **Pipeline fixo (1 LLM call)**: Para perguntas simples, um pipeline fixo com 1 chamada ao LLM pode ser suficiente. Isso é eficiente para casos onde a complexidade da pergunta não exige uma resposta detalhada.\n3. **Cache de queries**: Implemente um cache de queries para armazenar respostas pré-computadas para perguntas semelhantes. Isso pode reduzir significativamente o custo de processamento, especialmente em produção.\n4. **Personalização por usuário**: Utilize técnicas de personalização para enriquecer as consultas com informações do usuário, como histórico de pergunta, departamento e nível técnico. Isso pode ajudar a melhorar a relevância das respostas.\n5. **Multi-source retrieval**: Considere utilizar múltiplas fontes de dados para o RAG, como bases de conhecimento, APIs de busca e bancos de dados. Isso pode ajudar a aumentar a precisão das respostas e reduzir a complexidade do pipeline.\n\nEm termos de tecnologias específicas, aqui estão algumas sugestões:\n\n* **Redis**: Utilize Redis como cache para armazenar respostas pré-computadas.\n* **Docker**: Utilize Docker para containerizar o pipeline RAG e garantir escalabilidade e isolamento.\n* **Kubernetes**: Utilize Kubernetes para gerenciar a execução do pipeline em produção.\n\nLembre-se de que a escolha da stack depende das necessidades específicas do seu projeto e do time de desenvolvedores. É importante avaliar o custo relativo e a complexidade do projeto antes de tomar uma decisão.\n\nFontes:\n\n* \"Transformers: A Universal Model for Natural Language Processing\" (Hugging Face)\n* \"T5: A Pre-trained Model for Generation Tasks as Well as Translation\" (Meta AI)\n* \"RAG: Retrieval-Augmented Generation for Question Answering\" (arXiv)",
+          "answer_chars": 2109,
+          "latency_ms": 142767.8,
+          "prompt_tokens": 364,
+          "completion_tokens": 313,
+          "total_tokens": 677,
+          "estimated_cost_usd": 0.0,
+          "sources": [
+            "RAG-Document.pdf"
+          ],
+          "wall_clock_seconds": 145.9253008365631
+        }
+      }
+    }
+  },
+  "finished_at": "2026-06-03T22:02:42.224458"
+}

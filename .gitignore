@@ -23,3 +23,25 @@ node_modules/
 
 # Logs
 *.log
+
+# Agent tooling (opencode CLI, Mavis worktrees)
+.opencode/
+.worktrees/
+
+# Build artifacts / one-off outputs
+docs/rag-pdf/page.html
+docs/rag-pdf/build_part*.py
+docs/rag-pdf/build.py
+docs/rag-pdf/verify.py
+docs/ab-benchmark/*.log
+docs/ab-benchmark/*.pid
+docs/ab-benchmark/*.html
+docs/ab-benchmark/start_*.py
+
+# Backend runtime
+backend/logs/
+backend/.env
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db

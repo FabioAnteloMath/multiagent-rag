@@ -1,402 +1,345 @@
-# Multiagent RAG - Support Copilot
+# Multiagent RAG — Support Copilot
 
-A production-ready Retrieval-Augmented Generation (RAG) system with intelligent multi-agent routing for technical support.
+> A production-ready Retrieval-Augmented Generation (RAG) system with intelligent multi-agent routing, dynamic agent management, and side-by-side model A/B testing.
 
-[![Tests](https://img.shields.io/badge/tests-179%20passed-green)](tests/)
-[![Coverage](https://img.shields.io/badge/coverage-69%25-yellow)]()
-[![Python](https://img.shields.io/badge/python-3.11+-blue)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/fastapi-0.115-green)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/next.js-16.2-black)](https://nextjs.org)
+[![Backend](https://img.shields.io/badge/backend-FastAPI-009688)](https://fastapi.tiangolo.com)
+[![Frontend](https://img.shields.io/badge/frontend-Next.js%2016-black)](https://nextjs.org)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
+[![License](https://img.shields.io/badge/license-Portfolio-lightgrey)](#license)
+[![Security](https://img.shields.io/badge/security-OWASP%20Top%2010-blueviolet)](docs/security-implementation.md)
 
-## Overview
+## What it does
 
-**Support Copilot** is an AI-powered technical support system that uses specialized agents to answer questions about support documentation. It combines RAG (Retrieval-Augmented Generation) with intelligent routing to direct questions to the most relevant specialized agent.
+Drop your support docs (PDF/MD/TXT) into the system, and **specialized AI agents** answer customer questions with citations. The orchestrator classifies the question, picks the right agent(s), retrieves relevant chunks from a per-collection FAISS index, and synthesizes an answer with full source attribution.
 
-### Key Features
+Three execution modes:
 
-- **Multi-Agent Architecture**: 4 specialized agents (API Support, Database, DevOps, General)
-- **Intelligent Routing**: LLM-based classification with keyword fallback
-- **Multiple Modes**: Baseline (simple RAG), Auto (parallel multi-agent), Single RAG (single agent)
-- **Vector Search**: FAISS for efficient similarity search
-- **Dual LLM Support**: Ollama (local/free) or MiniMax (cloud/paid)
-- **Comprehensive Testing**: 179 tests with 69% code coverage
+| Mode | Behavior | Best for |
+|------|----------|----------|
+| **Baseline** | Single FAISS index over all docs, direct LLM | Performance baseline, fallback |
+| **Multi-Agent** | Classify → run all matching agents in parallel → aggregate | Cross-domain questions |
+| **Single RAG** | Classify → run ONE best-matching agent → clean single answer | Production lookups |
+
+Plus a **dynamic agent roster** (create, edit, activate, link to a collection) and a **multi-model A/B endpoint** to compare LLM providers on the same retrieval.
+
+## Why this project
+
+I built this to (a) learn multi-agent orchestration end-to-end, (b) study RAG retrieval quality with different chunking strategies, and (c) have a credible portfolio piece that demonstrates FastAPI, Next.js 16, FAISS, and four LLM providers in a real working system.
+
+It started with 4 hardcoded agents. It evolved into a fully DB-driven agent roster, four LLM providers, an A/B benchmark against real models, and a CI pipeline that runs Security/Bandit/pip-audit on every push.
+
+## Screenshots
+
+```
+coming soon — see docs/rag-pdf/rag-report.pdf for a deep-dive writeup
+```
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        FRONTEND (Next.js)                        │
-│   /chat    /documents    /collections    /agents    /chunks       │
-└─────────────────────────────────┬───────────────────────────────┘
-                                  │ HTTP :8011/api
-                                  ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     BACKEND (FastAPI + Python)                   │
-│                                                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────┐ │
-│  │ chat_routes │  │  documents  │  │ collections │  │ agents  │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────┘ │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    SERVICES LAYER                        │   │
-│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │   │
-│  │  │  RagPipeline │  │IndexManager │  │  LLM Providers   │  │   │
-│  │  └──────────────┘  └──────────────┘  │  (Ollama/MiniMax)│  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                      AGENTS LAYER                          │   │
-│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐  ┌───────┐  │   │
-│  │  │MasterAgent│  │  BaseAgent │  │ Classifier │  │ 4     │  │   │
-│  │  │  (orchestr)│  │  (abstract)│  │ (LLM/KW)   │  │Special│  │   │
-│  │  └────────────┘  └────────────┘  └────────────┘  └───────┘  │   │
-│  └──────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────┬───────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                          DATA LAYER                              │
-│                                                                       │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐ │
-│  │   SQLite    │  │    FAISS    │  │        Documents           │ │
-│  │  (metadata) │  │  (vectors) │  │   (data/docs/)             │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│  Frontend — Next.js 16 + React 19 + Tailwind 4                      │
+│  /chat  /documents  /collections  /agents  /documents/[id]/chunks   │
+└────────────────────────┬────────────────────────────────────────────┘
+                         │  fetch (HTTP) — :8011/api
+┌────────────────────────▼────────────────────────────────────────────┐
+│  Backend — FastAPI + SQLAlchemy + SQLite                            │
+│                                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────┐ │
+│  │chat_     │  │routes/   │  │routes/   │  │routes/   │  │/ask/  │ │
+│  │routes    │  │documents │  │collection│  │agents    │  │ab     │ │
+│  │/ask      │  │CRUD+chunk│  │CRUD+merge│  │CRUD+stat │  │A/B    │ │
+│  └─────┬────┘  └─────┬────┘  └────┬─────┘  └────┬─────┘  └───┬───┘ │
+│        │              │            │             │            │     │
+│  ┌─────▼──────────────▼────────────▼─────────────▼────────────▼────┐│
+│  │ Services                                                       ││
+│  │ ┌──────────┐ ┌──────────┐ ┌───────────────────────────────┐   ││
+│  │ │rag_      │ │index_    │ │llm_providers                  │   ││
+│  │ │pipeline  │ │manager   │ │┌──────┐┌──────┐┌─────┐┌──────┐│   ││
+│  │ │(baseline)│ │(FAISS)   │ ││Ollama││MiniMa││Groq ││Gemini│   ││
+│  │ └──────────┘ └──────────┘ │└──────┘└──────┘└─────┘└──────┘│   ││
+│  │                            └───────────────────────────────┘   ││
+│  └──────────────────────────────────────────────────────────────┘  │
+│                                                                     │
+│  ┌──────────────────────────────────────────────────────────────┐  │
+│  │ Agents — DB-driven roster                                    │  │
+│  │ ┌──────────┐ ┌──────────┐ ┌──────────┐                      │  │
+│  │ │master_   │ │dynamic_  │ │base_     │                      │  │
+│  │ │agent     │ │agent     │ │agent     │                      │  │
+│  │ │(orchestr)│ │(1 per row│ │(abstract)│                      │  │
+│  │ └──────────┘ └──────────┘ └──────────┘                      │  │
+│  └──────────────────────────────────────────────────────────────┘  │
+└────────────────────────┬────────────────────────────────────────────┘
+                         │
+       ┌─────────────────┼─────────────────┐
+       │                 │                 │
+       ▼                 ▼                 ▼
+  ┌─────────┐      ┌──────────┐     ┌──────────┐
+  │ SQLite  │      │  FAISS   │     │ Source   │
+  │ metadata│      │ vectors  │     │ docs/    │
+  │ db/     │      │ per      │     │ *.pdf    │
+  │         │      │collection│     │ *.md     │
+  └─────────┘      └──────────┘     │ *.txt    │
+                                    └──────────┘
 ```
 
-## Modes of Operation
+## Quick start
 
-| Mode | Description | Use Case |
-|------|-------------|----------|
-| **baseline** | Simple RAG with single FAISS index + Ollama | Performance comparison, fallback |
-| **auto** (MasterAgent) | Classify → Execute ALL matching agents in parallel → Aggregate | Questions that may span multiple areas |
-| **single_rag** | Classify → Execute ONE primary agent → Single answer | Cleaner answers, faster execution, lower cost |
+### Prerequisites
+- Python 3.11+
+- Node.js 18+
+- (Optional) Ollama for local LLMs — [install](https://ollama.ai) then `ollama pull llama3.2:3b`
+- (Optional) API keys for MiniMax, Groq, or Gemini
 
-## Project Structure
+### Option A — One command (Windows / PowerShell)
+
+```powershell
+# From project root
+pwsh scripts/start_dev_all.ps1
+```
+
+This opens two windows: backend (with auto-restart watchdog) on `:8011`, frontend (Next.js dev) on `:3000`. Both log to `backend/logs/`.
+
+Check status or stop everything:
+
+```powershell
+pwsh scripts/dev_services.ps1 -Status
+pwsh scripts/dev_services.ps1 -Stop
+```
+
+### Option B — Manual
+
+```bash
+# Backend
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS/Linux
+pip install -r backend/requirements.txt
+copy backend\.env.example backend\.env    # then fill in keys
+python run_server.py                     # listens on :8011
+
+# Frontend (in another terminal)
+cd frontend
+npm install
+npm run dev                              # listens on :3000
+```
+
+### Try it
+
+Open <http://localhost:3000>:
+1. **Documents** → upload a `.pdf`, `.md`, or `.txt` (or skip if you have docs in `data/docs/`)
+2. **Collections** → create a collection, link your document to it
+3. **Agents** → create an agent, set its provider/model, point it at the collection
+4. **Chat** → ask a question, watch the orchestrator pick the right agent
+
+API docs at <http://localhost:8011/docs>.
+
+## LLM providers
+
+The backend ships with four providers. Add a key to `backend/.env` for the ones you want to use — unset providers just won't be selectable in the UI.
+
+| Provider | Cost | Setup | Notes |
+|----------|------|-------|-------|
+| **Ollama** (local) | Free | `ollama pull llama3.2:3b` | Default. No internet, no key, slower. |
+| **MiniMax** (cloud) | Pay-as-you-go | `MINIMAX_API_KEY=...` | The primary cloud model in this project. |
+| **Groq** (free tier) | Free up to ~30 req/min | `GROQ_API_KEY=...` | Ultra-fast inference (10× faster than MiniMax in benchmarks). |
+| **Gemini** (free tier) | Free, rate-limited | `GEMINI_API_KEY=...` | Good for batch testing. |
+
+See `backend/.env.example` for the full list and `backend/app/services/llm_providers.py` for per-model pricing.
+
+## Agent management
+
+Agents are stored in the `agents` table — no code changes to add or modify one. Each agent has:
+
+- **Identity**: name, specialty (used as routing category), system prompt, guidelines, personality, response format, examples
+- **Model**: provider, model name, temperature
+- **Target**: linked to a collection (FAISS index)
+- **State**: `is_active` toggle (deactivated agents are skipped by the orchestrator)
+
+The **Agents** page in the UI lets you do all of this with provider catalog dropdowns (no need to type model names), live prompt editing with the `Make concise` button (auto-rewrites long prompts to be terser), and provider brand badges (Ollama / MiniMax / Groq / Gemini).
+
+## A/B endpoint
+
+`POST /api/ask/ab` runs the **same retrieval** through N models and returns them side-by-side with latency, tokens, and estimated cost.
+
+```bash
+curl -X POST http://localhost:8011/api/ask/ab \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "What is the rollback procedure?",
+    "top_k": 3,
+    "agent_category": "devops",
+    "models": [
+      {"provider": "groq", "model_name": "llama-3.1-8b-instant"},
+      {"provider": "minimax", "model_name": "MiniMax-M2.7"},
+      {"provider": "ollama", "model_name": "llama3.2:3b"}
+    ]
+  }'
+```
+
+A real-world benchmark against 4 models lives at [`docs/ab-benchmark/ab-test-report-v2.pdf`](docs/ab-benchmark/ab-test-report-v2.pdf).
+
+## Security
+
+OWASP Top 10 hardening is baked in (see [`docs/security-implementation.md`](docs/security-implementation.md) for the full audit):
+
+| Layer | Mechanism |
+|-------|-----------|
+| **Rate limiting** | slowapi: 60/min health, 10/min ingest, 30/min ask |
+| **Input validation** | Pydantic with min/max length, prompt-injection pattern matching (30+ regexes in EN/PT/ES) |
+| **CORS** | Whitelist via `ALLOWED_ORIGINS` env var |
+| **Security headers** | CSP, HSTS, X-Frame-Options, X-Content-Type-Options, XSS-Protection |
+| **Audit logging** | Middleware logs every `/api/*` request with IP, method, status, duration |
+| **Dependency scanning** | GitHub Actions runs Safety + Bandit + pip-audit on every push, Dependabot weekly |
+
+## Project structure
 
 ```
 multiagent-rag/
-├── backend/                    # FastAPI Python backend
+├── backend/                       # FastAPI + SQLAlchemy + SQLite
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── chat_routes.py      # /ask, /ingest, /health
+│   │   │   ├── chat_routes.py          # /api/ask, /api/ask/ab, /api/health
 │   │   │   └── routes/
-│   │   │       ├── documents.py    # Document CRUD + chunks
-│   │   │       ├── collections.py  # Collection management
-│   │   │       └── agents.py       # Agent management
+│   │   │       ├── documents.py        # Document CRUD + chunks + upload
+│   │   │       ├── collections.py      # Collection CRUD + merge
+│   │   │       └── agents.py           # Agent CRUD + stats
 │   │   ├── agents/
-│   │   │   ├── master_agent.py    # Orchestrator
-│   │   │   ├── base_agent.py       # Abstract base
-│   │   │   ├── classifiers.py      # LLM + Keyword classifiers
-│   │   │   ├── agente_suporte.py   # API Support agent
-│   │   │   ├── agente_database.py  # Database agent
-│   │   │   ├── agente_devops.py    # DevOps agent
-│   │   │   └── agente_generalista.py # General agent
+│   │   │   ├── master_agent.py         # Orchestrator (parallel delegation)
+│   │   │   ├── base_agent.py           # Abstract base
+│   │   │   ├── dynamic_agent.py        # DB-driven agent instance
+│   │   │   ├── classifiers.py          # LLM + keyword classifiers
+│   │   │   └── __init__.py
 │   │   ├── core/
-│   │   │   ├── database.py         # SQLite connection
-│   │   │   └── security.py         # Rate limiting, prompt injection
-│   │   ├── models/
-│   │   │   └── document.py         # SQLAlchemy models
+│   │   │   ├── database.py             # SQLite session
+│   │   │   ├── security.py             # Middleware (rate limit, headers)
+│   │   │   └── security_service.py     # Prompt injection detection
+│   │   ├── models/document.py          # SQLAlchemy models
 │   │   └── services/
-│   │       ├── llm_providers.py    # Ollama, MiniMax providers
-│   │       ├── rag_pipeline.py    # Baseline RAG
-│   │       └── index_manager.py    # Index management
-│   └── tests/                    # Test suite (162 tests)
-│       ├── unit/
-│       ├── integration/
-│       └── e2e/
-├── frontend/                   # Next.js 14 React frontend
+│   │       ├── llm_providers.py        # Ollama / MiniMax / Groq / Gemini
+│   │       ├── rag_pipeline.py         # Baseline RAG
+│   │       └── index_manager.py        # FAISS build/load
+│   ├── tests/                          # 7 test files (unit + integration + e2e)
+│   ├── requirements.txt
+│   └── .env.example
+├── frontend/                      # Next.js 16 + React 19 + Tailwind 4
 │   ├── app/
-│   │   ├── chat/
-│   │   ├── documents/
-│   │   ├── collections/
-│   │   ├── agents/
-│   │   └── chunks/
-│   └── lib/
-│       └── api.ts
-├── data/
-│   ├── docs/                  # Source documents (.pdf, .md, .txt)
-│   ├── faiss/                 # FAISS indexes per collection
-│   │   ├── SuporteAPI/
-│   │   ├── Database/
-│   │   ├── DevOps/
-│   │   └── General/
-│   └── db/                    # SQLite database
-└── docs/                      # Architecture docs
+│   │   ├── chat/page.tsx                # Chat UI with mode selector
+│   │   ├── documents/page.tsx           # Document list + upload
+│   │   ├── documents/[id]/chunks/       # Chunk viewer with pagination + search
+│   │   ├── collections/page.tsx
+│   │   ├── agents/page.tsx              # Agent management (catalog + editor)
+│   │   ├── page.tsx                     # Landing
+│   │   ├── layout.tsx
+│   │   └── globals.css
+│   └── lib/api.ts                       # Typed API client
+├── scripts/                       # PowerShell dev helpers
+│   ├── start_dev_all.ps1                # Start everything
+│   ├── watchdog_backend.ps1             # Auto-restart backend
+│   ├── dev_services.ps1                 # Status / stop
+│   └── README.md
+├── data/                          # SQLite + FAISS + source docs (gitignored)
+├── docs/                          # Architecture, security, A/B benchmark
+│   ├── rag-pdf/rag-report.pdf
+│   ├── ab-benchmark/ab-test-report-v2.pdf
+│   ├── security-implementation.md
+│   ├── milvus-rag-*.md
+│   └── ...
+├── .github/workflows/security.yml # Safety / Bandit / pip-audit
+├── run_server.py                  # Backend launcher
+├── import_docs.py                 # Idempotent import of existing data/docs/
+└── README.md
 ```
 
-## Quick Start
+## API endpoints
 
-### Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- Ollama (for local LLM) or MiniMax API key (for cloud)
-
-### Backend Setup
-
-```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8011
-```
-
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start the frontend
-npm run dev
-```
-
-### Access the Application
-
-- **Frontend**: http://localhost:3000
-- **API Docs**: http://localhost:8011/docs
-- **Health Check**: http://localhost:8011/api/health
-
-## Usage
-
-### 1. Ingest Documents
-
-Place `.pdf`, `.md`, or `.txt` files in `data/docs/`, then:
-
-```bash
-curl -X POST http://localhost:8011/api/ingest \
-  -H "Content-Type: application/json" \
-  -d '{"clear_existing": true, "chunk_size": 600, "chunk_overlap": 80}'
-```
-
-### 2. Ask Questions
-
-```bash
-# Single RAG mode (recommended for clean answers)
-curl -X POST http://localhost:8011/api/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "What are the criteria to abort a release?", "mode": "single_rag"}'
-
-# Auto mode (parallel multi-agent)
-curl -X POST http://localhost:8011/api/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "How to fix 401 error?", "mode": "auto"}'
-
-# Baseline mode (simple RAG)
-curl -X POST http://localhost:8011/api/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question": "How to fix 401 error?", "mode": "baseline"}'
-```
-
-### 3. Response Format
-
-```json
-{
-  "answer": "The criteria to abort a release are:...",
-  "sources": ["DevOps/release_criteria.md"],
-  "agent_used": ["DevOps Agent"],
-  "steps": ["route", "search", "generate"],
-  "tokens_used": 150,
-  "thinking": "Routing: What are the criteria...",
-  "model_used": "MiniMax-M2.7",
-  "total_time_ms": 1250.5,
-  "confidence": 0.9,
-  "collection_searched": "DevOps"
-}
-```
-
-## Configuration
-
-### LLM Providers
-
-**Ollama (Local)**
-```bash
-# Install Ollama and pull model
-ollama pull llama3.2:3b
-```
-
-**MiniMax (Cloud)** - Add to `backend/.env`:
-```
-MINIMAX_API_KEY=your_api_key_here
-```
-
-### Agent Configuration
-
-Agents are configured via the database. Access the Agents page in the frontend to:
-- Select provider (ollama/minimax)
-- Set model name and temperature
-- Customize system prompt
-- Assign to collections
-
-## Testing
-
-```bash
-cd backend
-
-# Run all tests
-python -m pytest tests/ -v
-
-# Run unit tests only (fast)
-python -m pytest tests/unit tests/integration -v
-
-# Run with coverage
-python -m pytest tests/ --cov=app --cov-report=term-missing
-
-# Generate HTML coverage report
-python -m pytest tests/ --cov=app --cov-report=html
-```
-
-### Test Coverage
-
-| Component | Coverage |
-|-----------|----------|
-| Agents | 77-100% |
-| Classifiers | 92% |
-| LLM Providers | 89% |
-| MasterAgent | 97% |
-| **Total** | **69%** |
-
-**179 tests** covering unit, integration, and E2E scenarios.
-
-## API Endpoints
-
-### Chat Routes
+### Chat
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/ingest` | Ingest documents |
-| POST | `/api/ask` | Ask question (baseline/auto/single_rag) |
+| `GET`  | `/api/health` | Health check |
+| `POST` | `/api/ask` | Ask a question (`mode`: baseline / auto / single_rag) |
+| `POST` | `/api/ask/ab` | Multi-model A/B comparison |
 
 ### Documents
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/documents` | List all documents |
-| POST | `/api/documents/upload` | Upload document |
-| DELETE | `/api/documents/{id}` | Delete document |
-| POST | `/api/documents/{id}/process` | Process document |
-| POST | `/api/documents/{id}/reindex` | Rebuild index |
+| `GET`  | `/api/documents` | List documents |
+| `POST` | `/api/documents/upload` | Upload a file |
+| `PUT`  | `/api/documents/{id}` | Update (e.g. move to a collection) |
+| `DELETE` | `/api/documents/{id}` | Delete |
+| `GET`  | `/api/documents/{id}/chunks` | List chunks (with pagination) |
+| `POST` | `/api/documents/{id}/chunks` | Add chunk |
+| `PUT`  | `/api/documents/{id}/chunks/{cid}` | Edit chunk |
+| `DELETE` | `/api/documents/{id}/chunks/{cid}` | Delete chunk |
+| `POST` | `/api/documents/{id}/reindex` | Rebuild FAISS index |
+| `POST` | `/api/documents/rebuild-all-indexes` | Rebuild all |
 
 ### Collections
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/collections` | List collections |
-| POST | `/api/collections` | Create collection |
-| PUT | `/api/collections/{id}` | Update collection |
-| DELETE | `/api/collections/{id}` | Delete collection |
+| `GET`  | `/api/collections` | List |
+| `POST` | `/api/collections` | Create |
+| `PUT`  | `/api/collections/{id}` | Update |
+| `DELETE` | `/api/collections/{id}` | Delete |
+| `POST` | `/api/collections/merge` | Merge two |
+| `GET`  | `/api/collections/{id}/documents` | List docs in collection |
 
 ### Agents
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/agents` | List agents |
-| POST | `/api/agents` | Create agent |
-| PUT | `/api/agents/{id}` | Update agent |
-| DELETE | `/api/agents/{id}` | Delete agent |
+| `GET`  | `/api/agents` | List (active + inactive) |
+| `POST` | `/api/agents` | Create |
+| `GET`  | `/api/agents/{id}` | Get one |
+| `PUT`  | `/api/agents/{id}` | Update |
+| `DELETE` | `/api/agents/{id}` | Delete |
+| `PUT`  | `/api/agents/{id}/collection/{cid}` | Link to a collection |
+| `GET`  | `/api/agents/{id}/stats` | Usage stats |
 
-## Specialized Agents
+## Development
 
-| Agent | Collection | Knowledge Area |
-|-------|-----------|---------------|
-| **API Support Agent** | SuporteAPI | HTTP errors (401, 403, 500), authentication, JWT, gateway |
-| **Database Agent** | Database | PostgreSQL, MySQL, Redis, queries, cache |
-| **DevOps Agent** | DevOps | Deploy, rollback, CI/CD, monitoring, Kubernetes |
-| **Generalist Agent** | General | General questions, fallback |
-
-## Technology Stack
-
-| Layer | Technology |
-|-------|------------|
-| Backend | FastAPI + SQLAlchemy + SQLite |
-| Frontend | Next.js 14 + Tailwind CSS + TypeScript |
-| Vector DB | FAISS (local, CPU) |
-| LLM | Ollama (local) or MiniMax (cloud) |
-| Embeddings | all-MiniLM-L6-v2 |
-| Testing | pytest + pytest-cov |
-
-## Security
-
-Implemented security measures following OWASP Top 10 guidelines:
-
-| Feature | Implementation |
-|---------|---------------|
-| **Rate Limiting** | slowapi: 60/min (health), 10/min (ingest), 30/min (ask) |
-| **Input Validation** | max_length=1000 on question, Pydantic validation |
-| **CORS** | Restrictive via `ALLOWED_ORIGINS` env var |
-| **Security Headers** | X-Content-Type-Options, X-Frame-Options, XSS-protection, HSTS, CSP |
-| **Audit Logging** | Middleware logs all API requests with IP, method, status, duration |
-| **Prompt Injection** | 30 regex patterns (EN/PT/ES) for common injection attempts |
-| **Input Sanitization** | Control character removal, whitespace trimming |
-| **A06 - Vulnerable Components** | GitHub Actions: Safety, Bandit, pip-audit + Dependabot |
-
-### Security Auditing
+### Running tests
 
 ```bash
-# Install tools
-pip install safety bandit pip-audit
-
-# Run all scans locally
-safety check --file backend/requirements.txt
-bandit -r backend/app
-pip-audit --file backend/requirements.txt
+cd backend
+python -m pytest tests/ -v
 ```
 
-### CI/CD Security Pipeline
+Unit tests cover agents, classifiers, LLM providers, security. Integration tests cover the orchestrator. E2E tests run against a live FastAPI instance.
 
-The project includes automated security scanning via GitHub Actions:
+### Adding a new LLM provider
 
-| Scanner | Purpose | Frequency |
-|---------|---------|-----------|
-| **Safety** | Check requirements.txt for CVEs | Every push |
-| **Bandit** | Static analysis for Python security | Every push |
-| **pip-audit** | Scan installed packages for vulnerabilities | Every push |
-| **Dependabot** | Automated dependency updates | Weekly |
+1. Subclass `LLMProvider` in `backend/app/services/llm_providers.py`
+2. Register it in `ModelProviderFactory.PROVIDERS`
+3. Add the model list to `PROVIDER_CATALOG` in `frontend/lib/api.ts`
 
-### Environment Variables
+The UI will pick it up automatically.
+
+### Adding a new agent at runtime
+
+You don't need to touch code. Use the **Agents** page in the UI, or:
 
 ```bash
-# .env file (never commit to git)
-MINIMAX_API_KEY=your_api_key_here
-ALLOWED_ORIGINS=https://app.example.com  # Comma-separated
+curl -X POST http://localhost:8011/api/agents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Postgres Tuning Agent",
+    "specialty": "postgres",
+    "collection_id": "<your-collection-uuid>",
+    "provider": "groq",
+    "model_name": "llama-3.1-8b-instant",
+    "temperature": 0.2,
+    "system_prompt": "You are a Postgres performance expert. Always reference EXPLAIN plans.",
+    "guidelines": "Cite the exact query from the user's question when possible.",
+    "personality": "Direct, no fluff, tables preferred over prose."
+  }'
 ```
 
-### Rate Limit Response
-
-When rate limit is exceeded:
-```json
-{"error": "Rate limit exceeded: 30/minute"}
-```
-
-For detailed documentation, see [docs/security-implementation.md](docs/security-implementation.md).
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+The new agent is immediately routable.
 
 ## License
 
-This project is for portfolio purposes. See LICENSE file for details.
-
-## Acknowledgments
-
-- [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
-- [LangChain](https://langchain.dev/) - LLM application framework
-- [FAISS](https://faiss.ai/) - Efficient similarity search
-- [Ollama](https://ollama.ai/) - Local LLM runtime
-- [Next.js](https://nextjs.org/) - React framework
+This project is for portfolio and study purposes. See [LICENSE](LICENSE) if present.
