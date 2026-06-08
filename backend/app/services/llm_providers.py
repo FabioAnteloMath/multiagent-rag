@@ -272,18 +272,25 @@ class GroqProvider(LLMProvider):
 
 
 class GeminiProvider(LLMProvider):
-    """Google Gemini provider - REST API, free tier with rate limits."""
+    """Google Gemini provider - REST API, free tier with rate limits.
+
+    Note: gemini-1.5-flash was retired in early 2026. The current
+    free-tier default is gemini-2.5-flash (1500 RPD, GA). Set
+    GEMINI_MODEL=gemini-3.1-flash-lite for higher RPD (5000) if you
+    have access.
+    """
 
     PRICING = {
-        "gemini-1.5-flash": {"input": 0.0, "output": 0.0},  # free tier
-        "gemini-1.5-pro": {"input": 0.0, "output": 0.0},    # free tier (rate limited)
-        "gemini-2.0-flash-exp": {"input": 0.0, "output": 0.0},
+        "gemini-2.5-flash": {"input": 0.0, "output": 0.0},        # free tier default
+        "gemini-2.5-flash-lite": {"input": 0.0, "output": 0.0},  # free tier
+        "gemini-2.5-pro": {"input": 0.0, "output": 0.0},          # free tier (rate limited)
+        "gemini-3.1-flash-lite": {"input": 0.0, "output": 0.0},  # free tier, newer
     }
 
     def __init__(
         self,
         api_key: str = None,
-        model_name: str = "gemini-1.5-flash",
+        model_name: str = "gemini-2.5-flash",
     ):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY", "")
         self.model_name = model_name
