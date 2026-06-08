@@ -17,7 +17,7 @@ export default function Home() {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-16">
                 <Link
                     href="/chat"
                     className="group bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg hover:border-blue-200 transition-all duration-300"
@@ -60,6 +60,21 @@ export default function Home() {
                     <h2 className="text-xl font-semibold text-slate-900 mb-2">Collections</h2>
                     <p className="text-slate-600 text-sm">
                         Organize documents by knowledge area
+                    </p>
+                </Link>
+
+                <Link
+                    href="/usage"
+                    className="group bg-white border border-slate-200 rounded-2xl p-6 hover:shadow-lg hover:border-slate-400 transition-all duration-300"
+                >
+                    <div className="w-12 h-12 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </div>
+                    <h2 className="text-xl font-semibold text-slate-900 mb-2">Usage</h2>
+                    <p className="text-slate-600 text-sm">
+                        Provider quota, fallback chain &amp; circuit-breaker state
                     </p>
                 </Link>
             </div>

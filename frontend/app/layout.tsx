@@ -37,6 +37,9 @@ export default function RootLayout({
                                 <Link href="/agents" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
                                     Agents
                                 </Link>
+                                <Link href="/usage" className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
+                                    Usage
+                                </Link>
                                 <Link href="/chat" className="ml-2 px-4 py-2 text-sm font-medium bg-blue-500 text-white hover:bg-blue-600 rounded-lg transition-colors">
                                     Chat
                                 </Link>
