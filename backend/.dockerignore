@@ -1,0 +1,47 @@
+# Don't ship local dev artifacts into the image
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.git
+.gitignore
+.opencode
+.worktrees
+.venv
+venv
+env
+
+# Test/build artifacts
+.pytest_cache
+.coverage
+htmlcov
+.mypy_cache
+.ruff_cache
+safety
+bandit
+*.egg-info
+dist
+build
+
+# Data and logs (volume-mounted in production)
+data
+logs
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Env files (NEVER bake secrets into the image)
+.env
+.env.*
+!.env.example
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Docs (not needed at runtime)
+docs
+README.md

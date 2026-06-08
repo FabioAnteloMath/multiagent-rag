@@ -14,7 +14,13 @@ class IndexManager:
     """Manages FAISS index rebuilding for collections."""
 
     def __init__(self):
-        self.project_root = Path(__file__).resolve().parents[3]
+        # Honor DATA_DIR env var (used in Docker/Fly volume mount) for FAISS persistence.
+        # Falls back to <project_root>/data for local dev.
+        data_root = os.getenv("DATA_DIR")
+        if data_root:
+            self.project_root = Path(data_root)
+        else:
+            self.project_root = Path(__file__).resolve().parents[3]
         self.embedding_model = "all-MiniLM-L6-v2"
         self._embeddings: Optional[HuggingFaceEmbeddings] = None
 

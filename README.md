@@ -340,6 +340,43 @@ curl -X POST http://localhost:8011/api/agents \
 
 The new agent is immediately routable.
 
+## Deploy (free tier)
+
+The repo ships ready-to-deploy configs for **Vercel** (frontend) and **Fly.io** (backend). Both free tiers, total cost **$0/month**, no sleep.
+
+| | What | Config |
+|---|---|---|
+| Frontend | Vercel (Next.js, global CDN, 100GB bandwidth) | `frontend/vercel.json` |
+| Backend | Fly.io (FastAPI + FAISS, 3 shared VMs, 3GB volume) | `backend/fly.toml` + `backend/Dockerfile` |
+| Data | Fly persistent volume (`/data` → SQLite + FAISS) | mounted in `fly.toml` |
+
+**One-time setup (~10 min):**
+
+```powershell
+# Backend
+cd backend
+fly auth signup
+fly volumes create rag_data --size 1
+fly launch --no-deploy                  # uses the fly.toml in this repo
+fly secrets set GROQ_API_KEY="gsk_..."  # or any provider
+fly deploy
+
+# Frontend
+cd ../frontend
+vercel login
+vercel env add NEXT_PUBLIC_API_URL production   # paste: https://<app>.fly.dev/api
+vercel --prod
+```
+
+After both deploys, lock CORS:
+
+```powershell
+cd ../backend
+fly secrets set ALLOWED_ORIGINS="https://<your-app>.vercel.app"
+```
+
+Full step-by-step, troubleshooting, and scaling notes: see **[DEPLOY.md](DEPLOY.md)**.
+
 ## License
 
 This project is for portfolio and study purposes. See [LICENSE](LICENSE) if present.

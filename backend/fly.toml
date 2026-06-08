@@ -1,0 +1,60 @@
+# fly.toml — Fly.io app configuration
+# Docs: https://fly.io/docs/reference/configuration/
+
+app = "multiagent-rag"
+primary_region = "gru"  # São Paulo — closest to Cuiabá
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # All real secrets go via `fly secrets set` (never commit them here)
+  DATA_DIR = "/data"
+  PORT = "8011"
+  # Set ALLOWED_ORIGINS via secrets once you know your Vercel URL, e.g.:
+  #   fly secrets set ALLOWED_ORIGINS="https://your-app.vercel.app"
+  PYTHONUNBUFFERED = "1"
+
+[mounts]
+  # Persistent volume for SQLite + FAISS indexes.
+  # Free tier includes 3GB of volume storage.
+  source = "rag_data"
+  destination = "/data"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8011
+  processes = ["app"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 50
+    soft_limit = 25
+
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/api/info"
+
+  # Generous timeouts — first LLM call can be slow
+  [services.tcp_checks]
+    interval = "30s"
+    timeout = "3s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
