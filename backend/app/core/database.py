@@ -33,5 +33,5 @@ def get_db():
 
 
 def init_db():
-    from app.models.document import Collection, Document, Chunk, Agent, ProcessingLog
+    from app.models.document import Collection, Document, Chunk, Agent, ProcessingLog, UsageLog
     Base.metadata.create_all(bind=engine)

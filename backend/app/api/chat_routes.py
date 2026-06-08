@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security_service import get_security_service
 from app.services.rag_pipeline import RagPipeline
+from app.services.provider_router import ProviderRouter
+from app.services.quota_tracker import QuotaExceeded
 from app.agents.master_agent import MasterAgent
 from app.agents.dynamic_agent import DynamicAgent
 from app.models import Agent, Collection
@@ -25,10 +27,19 @@ def get_master_agent(db: Session = Depends(get_db)) -> MasterAgent:
     Each active Agent row is wrapped in a DynamicAgent that uses the agent's
     own provider/model/prompt/collection. Agents without a collection are
     skipped (they would have no FAISS index to search).
+
+    A ProviderRouter is built once and shared across all agents so every
+    LLM call goes through the same quota + fallback machinery.
     """
     agents_dict: dict[str, "DynamicAgent"] = {}
     classifier_provider = "minimax"
     classifier_model = "MiniMax-M2.7"
+
+    # Build the router once. The router's `ask` method is a plain
+    # callable that AgentLLM can use as `router_callable`. This
+    # indirection lets the agent stay decoupled from SQLAlchemy.
+    router = ProviderRouter(db)
+    router_callable = router.ask
 
     rows = db.query(Agent).filter(Agent.is_active == 1).all()
     for row in rows:
@@ -47,7 +58,7 @@ def get_master_agent(db: Session = Depends(get_db)) -> MasterAgent:
             continue
 
         try:
-            agent = DynamicAgent(agent_row=row, collection_name=col.name)
+            agent = DynamicAgent(agent_row=row, collection_name=col.name, router_callable=router_callable)
         except Exception as e:
             print(f"[get_master_agent] failed to build agent '{row.name}': {e}")
             continue
@@ -62,6 +73,7 @@ def get_master_agent(db: Session = Depends(get_db)) -> MasterAgent:
         agents=agents_dict,
         classifier_provider=classifier_provider,
         classifier_model=classifier_model,
+        router_callable=router_callable,
     )
 
 
@@ -199,6 +211,22 @@ def ask_question(request: Request, payload: AskRequest, db: Session = Depends(ge
     except RuntimeError as exc:
         print(f"[API] RuntimeError: {exc}")
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except QuotaExceeded as qe:
+        # Every provider is exhausted for the rolling 24h window.
+        # 429 lets clients back off intelligently.
+        print(f"[API] QuotaExceeded: {qe}")
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "All provider quotas exhausted",
+                "provider": qe.provider,
+                "status": qe.status,
+            },
+            headers={
+                "Retry-After": "3600",
+                "X-Quota-Remaining": "0",
+            },
+        ) from qe
     except Exception as exc:
         print(f"[API] Exception: {exc}")
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -358,20 +386,23 @@ def ask_ab_test(
         f"Answer:"
     )
 
-    # 4. Run each model
+    # 4. Run each model — wrapped in the ProviderRouter for fallback + quota tracking
+    router_svc = ProviderRouter(db)
     results: list[ABModelResult] = []
     for spec in payload.models:
         t0 = time.time()
         spec_sys = spec.system_prompt or base_system
-        # If model has its own system_prompt, prepend it
         if spec.system_prompt:
             spec_prompt = f"{spec.system_prompt}\n\nContext:\n{context}\n\nQuestion: {payload.question}\n\nAnswer:"
         else:
             spec_prompt = full_prompt
 
         try:
-            llm = ModelProviderFactory.create(spec.provider, spec.model_name)
-            answer, usage = llm.generate_with_usage(
+            # The router tries the requested provider first, then walks
+            # the fallback chain. Quota tracking + circuit breaker apply.
+            answer, usage = router_svc.ask(
+                preferred=spec.provider,
+                model=spec.model_name,
                 prompt=spec_prompt,
                 temperature=spec.temperature,
                 max_tokens=spec.max_tokens,
@@ -379,18 +410,28 @@ def ask_ab_test(
             )
             latency_ms = (time.time() - t0) * 1000
 
+            # The actual provider that ended up serving the request may
+            # differ from spec.provider if a fallback happened.
+            served_provider = usage.get("provider", spec.provider)
+            served_model = usage.get("model", spec.model_name)
+            fell_back = served_provider != spec.provider
+
             prompt_tokens = usage.get("prompt_tokens", 0)
             completion_tokens = usage.get("completion_tokens", 0)
             total_tokens = usage.get("total_tokens", 0) or (prompt_tokens + completion_tokens)
 
-            # Estimate cost
+            # Estimate cost using the actually-served provider's pricing
             cost = 0.0
-            if hasattr(llm, "estimate_cost"):
-                cost = llm.estimate_cost(prompt_tokens, completion_tokens)
+            try:
+                llm_for_cost = ModelProviderFactory.create(served_provider, served_model)
+                if hasattr(llm_for_cost, "estimate_cost"):
+                    cost = llm_for_cost.estimate_cost(prompt_tokens, completion_tokens)
+            except Exception:
+                pass
 
             results.append(ABModelResult(
-                provider=spec.provider,
-                model_name=spec.model_name,
+                provider=served_provider,
+                model_name=served_model,
                 temperature=spec.temperature,
                 answer=answer,
                 sources=sources,
@@ -402,7 +443,23 @@ def ask_ab_test(
                 model_loaded=True,
                 raw_usage=usage,
             ))
-            print(f"[AB]   {spec.provider}:{spec.model_name} ok | {latency_ms:.0f}ms | {total_tokens} tok")
+            tag = f" (fallback from {spec.provider})" if fell_back else ""
+            print(f"[AB]   {served_provider}:{served_model}{tag} ok | {latency_ms:.0f}ms | {total_tokens} tok")
+        except QuotaExceeded as qe:
+            # Whole request is short-circuited because every provider is
+            # exhausted — return 429 with structured info.
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "error": "All provider quotas exhausted",
+                    "provider": qe.provider,
+                    "status": qe.status,
+                },
+                headers={
+                    "Retry-After": "3600",
+                    "X-Quota-Remaining": "0",
+                },
+            ) from qe
         except Exception as e:
             latency_ms = (time.time() - t0) * 1000
             results.append(ABModelResult(

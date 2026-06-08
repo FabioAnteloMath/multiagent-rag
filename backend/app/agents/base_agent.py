@@ -34,7 +34,10 @@ class BaseAgent(ABC):
         guidelines: str = "",
         personality: str = "",
         response_format: str = "",
-        examples: str = ""
+        examples: str = "",
+        # Optional: callable used by AgentLLM to route LLM calls through
+        # the ProviderRouter (quota + fallback). See services/provider_router.py.
+        router_callable=None,
     ):
         self.name = name
         self.category = category
@@ -50,6 +53,7 @@ class BaseAgent(ABC):
         self._vectorstore = None
         self._embeddings = None
         self._llm = None
+        self._router_callable = router_callable
 
     def _get_llm(self) -> AgentLLM:
         if self._llm is None:
@@ -57,7 +61,8 @@ class BaseAgent(ABC):
                 provider=self.provider,
                 model_name=self.model_name,
                 temperature=self.temperature,
-                system_prompt=self._system_prompt or f"You are {self.name}, a specialist in {self.category}."
+                system_prompt=self._system_prompt or f"You are {self.name}, a specialist in {self.category}.",
+                router_callable=self._router_callable,
             )
         return self._llm
 

@@ -13,6 +13,7 @@ from app.api.chat_routes import router as api_router
 from app.api.routes.documents import router as documents_router
 from app.api.routes.collections import router as collections_router
 from app.api.routes.agents import router as agents_router
+from app.api.routes.usage import router as usage_router
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -68,6 +69,7 @@ app.include_router(api_router, prefix="/api")
 app.include_router(documents_router, prefix="/api")
 app.include_router(collections_router, prefix="/api")
 app.include_router(agents_router, prefix="/api")
+app.include_router(usage_router, prefix="/api")
 
 ui_dir = os.path.join(os.path.dirname(__file__), "ui")
 if os.path.exists(ui_dir):

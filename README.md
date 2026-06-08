@@ -179,6 +179,69 @@ curl -X POST http://localhost:8011/api/ask/ab \
 
 A real-world benchmark against 4 models lives at [`docs/ab-benchmark/ab-test-report-v2.pdf`](docs/ab-benchmark/ab-test-report-v2.pdf).
 
+## LLM quota + fallback (free-tier protection)
+
+Every LLM call goes through `ProviderRouter`, which enforces three layers of protection so the deployed demo never goes over the free tier of any provider:
+
+1. **Per-provider rolling 24h quota** — counts requests in the `usage_log` table. When the daily limit is reached, that provider is skipped for the rest of the window.
+2. **Per-IP rate limit** — `slowapi` caps `/api/ask` at 30 req/min. Bot scrapers can't burn the quota.
+3. **Automatic fallback** — when the preferred provider fails (rate limit, network, 5xx) or is over quota, the router walks `FALLBACK_CHAIN` (default: `groq → gemini → minimax → ollama`) until one succeeds.
+4. **Circuit breaker** — if a provider returns 5+ failures in 60s the router stops calling it for 5 minutes. Prevents cascading timeouts.
+
+| Provider | Free tier | Default daily limit | Margin |
+|----------|-----------|---------------------|--------|
+| Groq | 14.4k req/day | 13,000 | ~10% |
+| Gemini | 1,500 req/day | 1,400 | ~7% |
+| MiniMax | varies | 5,000 (configurable) | — |
+| Ollama | unlimited (local) | 999,999 | — |
+
+If every provider is exhausted, `/api/ask` returns **HTTP 429** with `Retry-After: 3600` and a structured body describing the exhausted provider.
+
+### Visibility
+
+`GET /api/usage` returns the live snapshot:
+
+```json
+{
+  "enabled": true,
+  "providers": {
+    "chain": ["groq", "gemini", "minimax", "ollama"],
+    "providers": [
+      { "provider": "groq",   "used": 47,    "limit": 13000,  "remaining": 12953, "exhausted": false, "window_hours": 24 },
+      { "provider": "gemini", "used": 0,     "limit": 1400,   "remaining": 1400,  "exhausted": false, "window_hours": 24 },
+      { "provider": "minimax","used": 0,     "limit": 5000,   "remaining": 5000,  "exhausted": false, "window_hours": 24 },
+      { "provider": "ollama", "used": 0,     "limit": 999999, "remaining": 999999,"exhausted": false, "window_hours": 24 }
+    ]
+  },
+  "totals": { "rows_logged": 47 }
+}
+```
+
+A provider row can also carry `"circuit_open": true, "circuit_open_for_s": 287` if the breaker is open.
+
+### Configuration (env vars)
+
+```bash
+QUOTA_ENABLED=true
+QUOTA_GROQ_DAILY=13000
+QUOTA_GEMINI_DAILY=1400
+QUOTA_MINIMAX_DAILY=5000
+QUOTA_OLLAMA_DAILY=999999
+QUOTA_WINDOW_HOURS=24
+FALLBACK_CHAIN=groq,gemini,minimax,ollama
+```
+
+### When a fallback happens
+
+The A/B endpoint reflects the actually-served provider:
+
+```json
+{ "provider": "gemini", "model_name": "gemini-1.5-flash",
+  "answer": "...", "sources": ["..."], "latency_ms": 1234, ... }
+```
+
+The first `ABModelSpec` said `"provider": "groq"`, but the response shows `"provider": "gemini"` — meaning Groq failed and the router fell back. The `latency_ms` and `total_tokens` reflect the *actual* call, not the requested one.
+
 ## Security
 
 OWASP Top 10 hardening is baked in (see [`docs/security-implementation.md`](docs/security-implementation.md) for the full audit):
@@ -298,6 +361,12 @@ multiagent-rag/
 | `DELETE` | `/api/agents/{id}` | Delete |
 | `PUT`  | `/api/agents/{id}/collection/{cid}` | Link to a collection |
 | `GET`  | `/api/agents/{id}/stats` | Usage stats |
+
+### Quota & usage
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET`  | `/api/usage` | Current quota per provider + circuit-breaker state |
 
 ## Development
 

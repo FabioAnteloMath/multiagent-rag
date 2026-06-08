@@ -14,7 +14,7 @@ from app.models import Agent as AgentModel
 class DynamicAgent(BaseAgent):
     """Agent instance backed by an Agent DB row."""
 
-    def __init__(self, agent_row: AgentModel, collection_name: str):
+    def __init__(self, agent_row: AgentModel, collection_name: str, router_callable=None):
         self._row = agent_row
         category = (agent_row.specialty or agent_row.name or "agent").strip().lower()
         category = category.replace(" ", "_")
@@ -30,6 +30,7 @@ class DynamicAgent(BaseAgent):
             personality=agent_row.personality or "",
             response_format=agent_row.response_format or "",
             examples=agent_row.examples or "",
+            router_callable=router_callable,
         )
 
     @property

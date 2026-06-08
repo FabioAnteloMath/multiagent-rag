@@ -37,9 +37,10 @@ CLASSIFY_TIMEOUT = 30
 
 
 class LLMClassifier:
-    def __init__(self, provider: str = "minimax", model_name: str = "MiniMax-M2.7"):
+    def __init__(self, provider: str = "minimax", model_name: str = "MiniMax-M2.7", router_callable=None):
         self.provider = provider
         self.model_name = model_name
+        self._router_callable = router_callable
         self._llm = None
 
     def _get_llm(self) -> AgentLLM:
@@ -49,6 +50,7 @@ class LLMClassifier:
                 model_name=self.model_name,
                 temperature=0.1,
                 max_tokens=30,
+                router_callable=self._router_callable,
             )
         return self._llm
 

@@ -82,3 +82,25 @@ class ProcessingLog(Base):
     status = Column(String, default="pending")
     message = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class UsageLog(Base):
+    """Per-request LLM usage record. Used by QuotaTracker to enforce
+    free-tier limits and by /api/usage for visibility.
+
+    One row per call to a provider (including fallback attempts that
+    fail). A successful response increments `success=1`; a rate-limited
+    fallback increments `success=0` and stores the error in `error`.
+    """
+    __tablename__ = "usage_log"
+
+    id = Column(String, primary_key=True, default=generate_id)
+    provider = Column(String, nullable=False, index=True)         # e.g. "groq"
+    model = Column(String, nullable=False)                        # e.g. "llama-3.1-8b-instant"
+    prompt_tokens = Column(Integer, default=0)
+    completion_tokens = Column(Integer, default=0)
+    total_tokens = Column(Integer, default=0)
+    success = Column(Integer, default=1)                          # 1=ok, 0=failed
+    fallback_from = Column(String, nullable=True)                 # e.g. "groq" if this row was a fallback attempt
+    error = Column(Text, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

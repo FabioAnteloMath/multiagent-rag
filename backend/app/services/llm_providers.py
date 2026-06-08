@@ -386,7 +386,13 @@ class AgentLLM:
         temperature: float = 0.3,
         max_tokens: int = 2000,
         top_p: float = 0.9,
-        system_prompt: str = ""
+        system_prompt: str = "",
+        # Optional callback used to wrap a single LLM call in a
+        # ProviderRouter. If set, `generate_with_usage` delegates the
+        # actual call to the router (which provides fallback + quota
+        # tracking). If None, the original direct-call behaviour is
+        # preserved (used in unit tests that don't want a DB session).
+        router_callable=None,
     ):
         self.provider = provider
         self.model_name = model_name
@@ -395,6 +401,7 @@ class AgentLLM:
         self.top_p = top_p
         self._system_prompt = system_prompt
         self._llm = None
+        self._router_callable = router_callable
 
     def _get_llm(self) -> LLMProvider:
         if self._llm is None:
@@ -404,13 +411,28 @@ class AgentLLM:
             )
         return self._llm
 
-    def generate(self, user_prompt: str, context: str = "") -> str:
-        """Generate response with optional context."""
+    def _build_full_prompt(self, user_prompt: str, context: str) -> str:
         full_prompt = user_prompt
         if context:
             full_prompt = f"Context:\n{context}\n\nUser: {user_prompt}"
         if self._system_prompt:
             full_prompt = f"{self._system_prompt}\n\n{full_prompt}"
+        return full_prompt
+
+    def generate(self, user_prompt: str, context: str = "") -> str:
+        """Generate response with optional context."""
+        full_prompt = self._build_full_prompt(user_prompt, context)
+
+        if self._router_callable is not None:
+            answer, _ = self._router_callable(
+                preferred=self.provider,
+                model=self.model_name,
+                prompt=full_prompt,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
+            )
+            return answer
 
         llm = self._get_llm()
         return llm.generate(
@@ -421,12 +443,23 @@ class AgentLLM:
         )
 
     def generate_with_usage(self, user_prompt: str, context: str = "") -> Tuple[str, dict]:
-        """Generate response with usage tracking."""
-        full_prompt = user_prompt
-        if context:
-            full_prompt = f"Context:\n{context}\n\nUser: {user_prompt}"
-        if self._system_prompt:
-            full_prompt = f"{self._system_prompt}\n\n{full_prompt}"
+        """Generate response with usage tracking.
+
+        If `router_callable` is set, the call goes through the
+        ProviderRouter (quota + fallback). Otherwise it calls the
+        configured provider directly (legacy / test path).
+        """
+        full_prompt = self._build_full_prompt(user_prompt, context)
+
+        if self._router_callable is not None:
+            return self._router_callable(
+                preferred=self.provider,
+                model=self.model_name,
+                prompt=full_prompt,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                top_p=self.top_p,
+            )
 
         llm = self._get_llm()
         return llm.generate_with_usage(

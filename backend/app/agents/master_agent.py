@@ -46,11 +46,13 @@ class MasterAgent:
         agents: Optional[Dict[str, BaseAgent]] = None,
         classifier_provider: str = "minimax",
         classifier_model: str = "MiniMax-M2.7",
+        router_callable=None,
     ):
         self.agents: Dict[str, BaseAgent] = agents or {}
         self.classifier = LLMClassifier(
             provider=classifier_provider,
             model_name=classifier_model,
+            router_callable=router_callable,
         )
         self.use_llm_classify = True
         self.agent_timeout = 180
