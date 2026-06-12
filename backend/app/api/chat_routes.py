@@ -41,7 +41,7 @@ def get_master_agent(db: Session = Depends(get_db)) -> MasterAgent:
     router = ProviderRouter(db)
     router_callable = router.ask
 
-    rows = db.query(Agent).filter(Agent.is_active == 1).all()
+    rows = db.query(Agent).filter(Agent.is_active == True).all()
     for row in rows:
         # Classifier row: special case - used to configure the LLM classifier
         if (row.specialty or "").strip().lower() == "classifier" or "classif" in (row.name or "").lower():
@@ -317,7 +317,7 @@ def ask_ab_test(
     if not collection_name and payload.agent_category:
         agent_row = (
             db.query(Agent)
-            .filter(Agent.is_active == 1)
+            .filter(Agent.is_active == True)
             .filter(Agent.specialty == payload.agent_category)
             .first()
         )

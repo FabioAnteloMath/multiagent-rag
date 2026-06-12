@@ -135,7 +135,7 @@ class QuotaTracker:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             total_tokens=prompt_tokens + completion_tokens,
-            success=1 if success else 0,
+            success=bool(success),
             fallback_from=fallback_from,
             error=error[:500] if error else "",
         )

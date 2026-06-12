@@ -152,7 +152,7 @@ class TestUsageLogging:
             rows = db_session.query(UsageLog).all()
             assert len(rows) == 1
             assert rows[0].provider == "groq"
-            assert rows[0].success == 1
+            assert rows[0].success is True
 
     def test_records_failed_request_with_fallback_marker(self, db_session):
         from app.models import UsageLog
@@ -167,5 +167,5 @@ class TestUsageLogging:
             rows = db_session.query(UsageLog).all()
             # 1 row for the groq failure, 1 row for the gemini success
             assert len(rows) == 2
-            assert any(r.provider == "groq" and r.success == 0 for r in rows)
-            assert any(r.provider == "gemini" and r.success == 1 for r in rows)
+            assert any(r.provider == "groq" and r.success is False for r in rows)
+            assert any(r.provider == "gemini" and r.success is True for r in rows)
