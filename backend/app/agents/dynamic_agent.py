@@ -24,7 +24,7 @@ class DynamicAgent(BaseAgent):
             collection_name=collection_name,
             provider=agent_row.provider or "minimax",
             model_name=agent_row.model_name or "MiniMax-M2.7",
-            temperature=float(agent_row.temperature) if agent_row.temperature else 0.3,
+            temperature=agent_row.temperature if agent_row.temperature is not None else 0.3,
             system_prompt=agent_row.system_prompt or "",
             guidelines=agent_row.guidelines or "",
             personality=agent_row.personality or "",

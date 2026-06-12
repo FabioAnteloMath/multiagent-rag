@@ -65,33 +65,37 @@ class AgentStats(BaseModel):
     avg_response_time: float = 0.0
 
 
+def _to_response(agent: Agent, collection_name: Optional[str]) -> AgentResponse:
+    return AgentResponse(
+        id=agent.id,
+        name=agent.name,
+        specialty=agent.specialty or "",
+        system_prompt=agent.system_prompt or "",
+        guidelines=agent.guidelines or "",
+        personality=agent.personality or "",
+        response_format=agent.response_format or "",
+        examples=agent.examples or "",
+        collection_id=agent.collection_id,
+        collection_name=collection_name,
+        provider=agent.provider or "minimax",
+        model_name=agent.model_name,
+        temperature=agent.temperature if agent.temperature is not None else 0.3,
+        is_active=bool(agent.is_active),
+        created_at=agent.created_at.isoformat() if agent.created_at else "",
+    )
+
+
+def _resolve_collection_name(db: Session, agent: Agent) -> Optional[str]:
+    if not agent.collection_id:
+        return None
+    col = db.query(Collection).filter(Collection.id == agent.collection_id).first()
+    return col.name if col else None
+
+
 @router.get("", response_model=list[AgentResponse])
 def list_agents(db: Session = Depends(get_db)):
     agents = db.query(Agent).order_by(Agent.created_at.desc()).all()
-    result = []
-    for agent in agents:
-        collection_name = None
-        if agent.collection_id:
-            col = db.query(Collection).filter(Collection.id == agent.collection_id).first()
-            collection_name = col.name if col else None
-        result.append(AgentResponse(
-            id=agent.id,
-            name=agent.name,
-            specialty=agent.specialty or "",
-            system_prompt=agent.system_prompt or "",
-            guidelines=agent.guidelines or "",
-            personality=agent.personality or "",
-            response_format=agent.response_format or "",
-            examples=agent.examples or "",
-            collection_id=agent.collection_id,
-            collection_name=collection_name,
-            provider=agent.provider or "minimax",
-            model_name=agent.model_name,
-            temperature=float(agent.temperature or 0.3),
-            is_active=bool(agent.is_active),
-            created_at=agent.created_at.isoformat() if agent.created_at else ""
-        ))
-    return result
+    return [_to_response(a, _resolve_collection_name(db, a)) for a in agents]
 
 
 @router.post("", response_model=AgentResponse)
@@ -118,35 +122,13 @@ def create_agent(agent_data: AgentCreate, db: Session = Depends(get_db)):
         collection_id=agent_data.collection_id,
         provider=agent_data.provider,
         model_name=agent_data.model_name,
-        temperature=str(agent_data.temperature),
-        is_active=1
+        temperature=agent_data.temperature,
+        is_active=True,
     )
     db.add(new_agent)
     db.commit()
     db.refresh(new_agent)
-
-    collection_name = None
-    if new_agent.collection_id:
-        col = db.query(Collection).filter(Collection.id == new_agent.collection_id).first()
-        collection_name = col.name if col else None
-
-    return AgentResponse(
-        id=new_agent.id,
-        name=new_agent.name,
-        specialty=new_agent.specialty or "",
-        system_prompt=new_agent.system_prompt or "",
-        guidelines=new_agent.guidelines or "",
-        personality=new_agent.personality or "",
-        response_format=new_agent.response_format or "",
-        examples=new_agent.examples or "",
-        collection_id=new_agent.collection_id,
-        collection_name=collection_name,
-        provider=new_agent.provider or "minimax",
-        model_name=new_agent.model_name,
-        temperature=float(new_agent.temperature or 0.3),
-        is_active=bool(new_agent.is_active),
-        created_at=new_agent.created_at.isoformat() if new_agent.created_at else ""
-    )
+    return _to_response(new_agent, _resolve_collection_name(db, new_agent))
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)
@@ -154,29 +136,7 @@ def get_agent(agent_id: str, db: Session = Depends(get_db)):
     agent = db.query(Agent).filter(Agent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agente nao encontrado")
-
-    collection_name = None
-    if agent.collection_id:
-        col = db.query(Collection).filter(Collection.id == agent.collection_id).first()
-        collection_name = col.name if col else None
-
-    return AgentResponse(
-        id=agent.id,
-        name=agent.name,
-        specialty=agent.specialty or "",
-        system_prompt=agent.system_prompt or "",
-        guidelines=agent.guidelines or "",
-        personality=agent.personality or "",
-        response_format=agent.response_format or "",
-        examples=agent.examples or "",
-        collection_id=agent.collection_id,
-        collection_name=collection_name,
-        provider=agent.provider or "minimax",
-        model_name=agent.model_name,
-        temperature=float(agent.temperature or 0.3),
-        is_active=bool(agent.is_active),
-        created_at=agent.created_at.isoformat() if agent.created_at else ""
-    )
+    return _to_response(agent, _resolve_collection_name(db, agent))
 
 
 @router.put("/{agent_id}", response_model=AgentResponse)
@@ -209,35 +169,13 @@ def update_agent(agent_id: str, update: AgentUpdate, db: Session = Depends(get_d
     if update.model_name is not None:
         agent.model_name = update.model_name
     if update.temperature is not None:
-        agent.temperature = str(update.temperature)
+        agent.temperature = update.temperature
     if update.is_active is not None:
-        agent.is_active = 1 if update.is_active else 0
+        agent.is_active = update.is_active
 
     db.commit()
     db.refresh(agent)
-
-    collection_name = None
-    if agent.collection_id:
-        col = db.query(Collection).filter(Collection.id == agent.collection_id).first()
-        collection_name = col.name if col else None
-
-    return AgentResponse(
-        id=agent.id,
-        name=agent.name,
-        specialty=agent.specialty or "",
-        system_prompt=agent.system_prompt or "",
-        guidelines=agent.guidelines or "",
-        personality=agent.personality or "",
-        response_format=agent.response_format or "",
-        examples=agent.examples or "",
-        collection_id=agent.collection_id,
-        collection_name=collection_name,
-        provider=agent.provider or "minimax",
-        model_name=agent.model_name,
-        temperature=float(agent.temperature or 0.3),
-        is_active=bool(agent.is_active),
-        created_at=agent.created_at.isoformat() if agent.created_at else ""
-    )
+    return _to_response(agent, _resolve_collection_name(db, agent))
 
 
 @router.delete("/{agent_id}")
@@ -274,5 +212,5 @@ def get_agent_stats(agent_id: str, db: Session = Depends(get_db)):
     return AgentStats(
         total_queries=0,
         successful_queries=0,
-        avg_response_time=0.0
+        avg_response_time=0.0,
     )

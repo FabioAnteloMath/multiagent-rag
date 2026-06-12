@@ -1,4 +1,14 @@
-from sqlalchemy import Column, String, Integer, DateTime, Text, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    TypeDecorator,
+)
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -10,13 +20,77 @@ def generate_id():
     return str(uuid.uuid4())
 
 
+class _CoerceFloat(TypeDecorator):
+    """Float column that transparently accepts legacy string values.
+
+    Earlier versions of the schema stored `Agent.temperature` as a
+    String (because the API endpoints received it as a string and we
+    never normalized). This decorator makes reads tolerant: if a
+    row still has the old "0.3" form, the value comes back as 0.3
+    instead of crashing. Writes always go out as proper floats.
+
+    Backward compatibility is the only reason this exists — once the
+    legacy rows are gone, the decorator can be removed and the column
+    can be a plain `Float`.
+    """
+
+    impl = Float
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return float(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+        return None
+
+
+class _CoerceBool(TypeDecorator):
+    """Boolean column that accepts legacy INTEGER 0/1 rows on read.
+
+    Same rationale as `_CoerceFloat`: the `is_active`, `is_default`,
+    and `UsageLog.success` columns were originally declared as
+    `Integer` and we never migrated the data. Reads from a legacy
+    row return a proper `bool`; writes always go out as a bool.
+
+    SQLAlchemy emits a CAST for the column so the underlying
+    INTEGER/Float value is converted on the way out. SQLite handles
+    `CAST(1 AS BOOLEAN)` returning 1 and Python bool() of 1 is True,
+    so filter expressions like `Agent.is_active == True` still match
+    legacy rows.
+    """
+
+    impl = Boolean
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        return bool(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return bool(value)
+
+
 class Collection(Base):
     __tablename__ = "collections"
 
     id = Column(String, primary_key=True, default=generate_id)
     name = Column(String, unique=True, nullable=False)
     description = Column(Text, default="")
-    is_default = Column(Integer, default=0)
+    is_default = Column(_CoerceBool, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -67,9 +141,12 @@ class Agent(Base):
     collection_id = Column(String, ForeignKey("collections.id"), nullable=True)
     provider = Column(String, default="ollama")
     model_name = Column(String, default="llama3.2:3b")
-    temperature = Column(String, default="0.3")
+    # Stored as a real float now. _CoerceFloat tolerates legacy string rows
+    # (e.g. "0.3") on read so we don't need a data migration just to boot
+    # against a pre-existing dev DB.
+    temperature = Column(_CoerceFloat, default=0.3, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    is_active = Column(Integer, default=1)
+    is_active = Column(_CoerceBool, default=True, nullable=False)
 
     collection = relationship("Collection", back_populates="agents")
 
@@ -89,8 +166,9 @@ class UsageLog(Base):
     free-tier limits and by /api/usage for visibility.
 
     One row per call to a provider (including fallback attempts that
-    fail). A successful response increments `success=1`; a rate-limited
-    fallback increments `success=0` and stores the error in `error`.
+    fail). A successful response increments `success=True`; a
+    rate-limited fallback increments `success=False` and stores the
+    error in `error`.
     """
     __tablename__ = "usage_log"
 
@@ -100,7 +178,7 @@ class UsageLog(Base):
     prompt_tokens = Column(Integer, default=0)
     completion_tokens = Column(Integer, default=0)
     total_tokens = Column(Integer, default=0)
-    success = Column(Integer, default=1)                          # 1=ok, 0=failed
-    fallback_from = Column(String, nullable=True)                 # e.g. "groq" if this row was a fallback attempt
+    success = Column(_CoerceBool, default=True, nullable=False)        # True=ok, False=failed
+    fallback_from = Column(String, nullable=True)                  # e.g. "groq" if this row was a fallback attempt
     error = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
