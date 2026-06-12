@@ -68,11 +68,13 @@ function formatTime(ms: number): string {
 }
 
 function renderMarkdown(text: string): string {
-    // Escape HTML first
+    // Escape HTML first to prevent XSS via LLM/retrieved-doc content.
+    // Order matters: & must be replaced first, otherwise we'd double-escape
+    // the ampersands introduced by the < and > replacements below.
     let html = text
-        .replace(/&/g, '&')
-        .replace(/</g, '<')
-        .replace(/>/g, '>');
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
     
     // Code blocks with syntax highlighting appearance
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
