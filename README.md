@@ -5,7 +5,7 @@
 [![Backend](https://img.shields.io/badge/backend-FastAPI-009688)](https://fastapi.tiangolo.com)
 [![Frontend](https://img.shields.io/badge/frontend-Next.js%2016-black)](https://nextjs.org)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://python.org)
-[![License](https://img.shields.io/badge/license-Portfolio-lightgrey)](#license)
+[![License](https://img.shields.io/badge/license-MIT-green)](#license)
 [![Security](https://img.shields.io/badge/security-OWASP%20Top%2010-blueviolet)](docs/security-implementation.md)
 
 ## What it does
@@ -448,4 +448,4 @@ Full step-by-step, troubleshooting, and scaling notes: see **[DEPLOY.md](DEPLOY.
 
 ## License
 
-This project is for portfolio and study purposes. See [LICENSE](LICENSE) if present.
+[MIT](LICENSE) — Copyright (c) 2026 Matheus Fabio Antelo. Free to use, modify, and distribute.
