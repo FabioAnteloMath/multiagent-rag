@@ -60,11 +60,17 @@ export interface AskResponse {
   collection_searched?: string;
 }
 
-export async function updateDocument(id: string, collectionId?: string): Promise<Document> {
+export async function updateDocument(id: string, collectionId?: string | null): Promise<Document> {
+  // Backend expects `collection_id`. Pass null explicitly to detach from a collection,
+  // or undefined to leave it untouched. The backend treats null as "remove".
+  const body: Record<string, unknown> = {};
+  if (collectionId !== undefined) {
+    body.collection_id = collectionId;
+  }
   const res = await fetch(`${API_BASE}/documents/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ collection_id: collectionId }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error('Failed to update document');
   return res.json();
@@ -86,9 +92,11 @@ export async function getDocument(id: string): Promise<Document> {
   return res.json();
 }
 
-export async function uploadDocument(file: File, collectionId?: string): Promise<{ id: string; filename: string; status: string; message: string }> {
+export async function uploadDocument(file: File, collectionId?: string | null): Promise<{ id: string; filename: string; status: string; message: string }> {
   const formData = new FormData();
   formData.append('file', file);
+  // Send `collection_id` even when empty string so the backend can distinguish
+  // "explicitly no collection" from "caller forgot". The backend ignores falsy.
   if (collectionId) formData.append('collection_id', collectionId);
 
   const res = await fetch(`${API_BASE}/documents/upload`, {
@@ -287,6 +295,15 @@ export async function rebuildDocumentIndex(documentId: string): Promise<{ succes
     credentials: 'include',
   } as RequestInit);
   if (!res.ok) throw new Error('Failed to rebuild index');
+  return res.json();
+}
+
+export async function rebuildAllIndexes(): Promise<{ message: string; results: Record<string, unknown> }> {
+  const res = await fetch(`${API_BASE}/documents/rebuild-all-indexes`, {
+    method: 'POST',
+    credentials: 'include',
+  } as RequestInit);
+  if (!res.ok) throw new Error('Failed to rebuild all indexes');
   return res.json();
 }
 
