@@ -111,6 +111,7 @@ interface EditForm {
     temperature: number;
     collection_id: string;
     is_active: boolean;
+    is_fallback: boolean;
     system_prompt: string;
     guidelines: string;
     personality: string;
@@ -126,6 +127,7 @@ const EMPTY_FORM: EditForm = {
     temperature: 0.3,
     collection_id: "",
     is_active: true,
+    is_fallback: false,
     system_prompt: "",
     guidelines: "",
     personality: "",
@@ -184,6 +186,7 @@ export default function AgentsPage() {
             temperature: agent.temperature ?? 0.3,
             collection_id: agent.collection_id || "",
             is_active: agent.is_active,
+            is_fallback: !!agent.is_fallback,
             system_prompt: agent.system_prompt || "",
             guidelines: agent.guidelines || "",
             personality: agent.personality || "",
@@ -219,6 +222,7 @@ export default function AgentsPage() {
                 temperature: editForm.temperature,
                 collection_id: editForm.collection_id || null,
                 is_active: editForm.is_active,
+                is_fallback: editForm.is_fallback,
                 system_prompt: editForm.system_prompt,
                 guidelines: editForm.guidelines,
                 personality: editForm.personality,
@@ -407,6 +411,11 @@ export default function AgentsPage() {
                                         <span>Specialty: <span className="text-slate-600 font-mono">{agent.specialty || "general"}</span></span>
                                         <span>Collection: <span className="text-slate-600 font-mono">{agent.collection_name || "— none —"}</span></span>
                                         <span>Temp: <span className="text-slate-600 font-mono">{agent.temperature}</span></span>
+                                        {agent.is_fallback && (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
+                                                Fallback
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -630,6 +639,22 @@ function AgentEditModal({ form, setForm, collections, agents, editingAgent, isCr
                             <span className="text-sm text-slate-700">
                                 {form.is_active ? "Active" : "Inactive"} (inactive agents are skipped by the router)
                             </span>
+                        </div>
+
+                        <div className="mt-3 flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setForm({ ...form, is_fallback: !form.is_fallback })}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.is_fallback ? "bg-amber-500" : "bg-slate-300"}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.is_fallback ? "translate-x-6" : "translate-x-1"}`} />
+                            </button>
+                            <div className="text-sm text-slate-700">
+                                <div className="font-medium">Fallback agent</div>
+                                <div className="text-xs text-slate-500">
+                                    Só é chamado quando nenhum specialist tiver contexto relevante. Use para um agent "coringa" que cobre perguntas genéricas.
+                                </div>
+                            </div>
                         </div>
                     </div>
 

@@ -147,6 +147,11 @@ class Agent(Base):
     temperature = Column(_CoerceFloat, default=0.3, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     is_active = Column(_CoerceBool, default=True, nullable=False)
+    # True = fallback agent. The MasterAgent only uses fallback agents when no
+    # specialist has relevant context. Agents without a collection (collection_id
+    # is NULL) are *implicitly* fallbacks, but having an explicit flag lets you
+    # mark an agent with a collection as a last-resort responder too.
+    is_fallback = Column(_CoerceBool, default=False, nullable=False)
 
     collection = relationship("Collection", back_populates="agents")
 
