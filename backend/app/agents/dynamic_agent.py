@@ -31,6 +31,7 @@ class DynamicAgent(BaseAgent):
             response_format=agent_row.response_format or "",
             examples=agent_row.examples or "",
             router_callable=router_callable,
+            is_fallback=bool(agent_row.is_fallback) if hasattr(agent_row, "is_fallback") else False,
         )
 
     @property

@@ -121,6 +121,9 @@ class AskResponse(BaseModel):
     total_time_ms: float = 0.0
     confidence: float = 0.0
     collection_searched: Optional[str] = None
+    # Transparency into *how* the question was routed. Lets the UI show
+    # "via keyword match (hyde)" instead of just the chosen agent name.
+    routing: Optional[dict] = None
 
 
 @router.get("/health")
@@ -186,7 +189,8 @@ def ask_question(request: Request, payload: AskRequest, db: Session = Depends(ge
                 model_used=result.model_used,
                 total_time_ms=result.total_time_ms,
                 confidence=result.confidence,
-                collection_searched=getattr(result, 'collection_searched', None)
+                collection_searched=getattr(result, 'collection_searched', None),
+                routing=getattr(result, 'routing', None),
             )
         else:
             print("[API] Using MasterAgent (auto)")
@@ -206,7 +210,8 @@ def ask_question(request: Request, payload: AskRequest, db: Session = Depends(ge
                 thinking=result.thinking,
                 model_used=result.model_used,
                 total_time_ms=result.total_time_ms,
-                confidence=result.confidence
+                confidence=result.confidence,
+                routing=result.routing,
             )
     except RuntimeError as exc:
         print(f"[API] RuntimeError: {exc}")

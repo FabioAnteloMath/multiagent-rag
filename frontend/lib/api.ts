@@ -43,7 +43,19 @@ export interface Agent {
   model_name: string;
   temperature: number;
   is_active: boolean;
+  is_fallback: boolean;
   created_at: string;
+}
+
+export interface RoutingInfo {
+  chosen: string[];
+  via: "llm" | "keyword" | "llm_override_keyword" | "default" | "clarifying" | string;
+  llm_category?: string | null;
+  llm_confidence?: number | null;
+  llm_raw?: string;
+  keyword_matches: string[];
+  fallback_used: boolean;
+  reasoning: string;
 }
 
 export interface AskResponse {
@@ -58,6 +70,7 @@ export interface AskResponse {
   total_time_ms?: number;
   confidence?: number;
   collection_searched?: string;
+  routing?: RoutingInfo | null;
 }
 
 export async function updateDocument(id: string, collectionId?: string | null): Promise<Document> {
@@ -225,6 +238,7 @@ export async function createAgent(data: {
   personality?: string;
   response_format?: string;
   examples?: string;
+  is_fallback?: boolean | null;
 }): Promise<Agent> {
   const res = await fetch(`${API_BASE}/agents`, {
     method: 'POST',
@@ -251,6 +265,7 @@ export async function updateAgent(id: string, data: {
   model_name?: string;
   temperature?: number;
   is_active?: boolean;
+  is_fallback?: boolean;
   system_prompt?: string;
   guidelines?: string;
   personality?: string;
