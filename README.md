@@ -30,9 +30,41 @@ It started with 4 hardcoded agents. It evolved into a fully DB-driven agent rost
 
 ## Screenshots
 
-```
-coming soon — see docs/rag-pdf/rag-report.pdf for a deep-dive writeup
-```
+A real walkthrough of the UI against a seeded demo dataset (4 collections, 12 docs, 5 agents, 32 usage-log rows). See `backend/scripts/seed_for_screenshots.py` to reproduce.
+
+### Landing
+
+![Landing page](docs/screenshots/landing.png)
+
+### Chat with RAG answer
+
+The orchestrator picked the `DevOps` agent, retrieved from `deployment-strategy.md` + `rollback-procedure.md`, and rendered a markdown answer with sources and token usage.
+
+![Chat with RAG answer](docs/screenshots/chat-answer.png)
+
+### Documents
+
+12 indexed docs across the four collections, each with a chunk count and quick actions (Edit Chunks / Delete).
+
+![Documents list](docs/screenshots/documents.png)
+
+### Collections
+
+Four knowledge areas (SuporteAPI · Database · DevOps · General) with doc counts and the default badge on the primary one.
+
+![Collections grid](docs/screenshots/collections.png)
+
+### Agents
+
+Five specialists across Groq / MiniMax / Ollama / Gemini — each with system prompt, guidelines, personality, response format, and the `Make concise` editor.
+
+![Agents management](docs/screenshots/agents.png)
+
+### Usage & quota
+
+Live dashboard of provider health, per-provider free-tier usage, and the fallback chain. The `enforcement off` chip tells you the dev server is running without quota gates.
+
+![Usage dashboard](docs/screenshots/usage.png)
 
 ## Architecture
 
