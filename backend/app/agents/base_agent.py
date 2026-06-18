@@ -38,6 +38,7 @@ class BaseAgent(ABC):
         # Optional: callable used by AgentLLM to route LLM calls through
         # the ProviderRouter (quota + fallback). See services/provider_router.py.
         router_callable=None,
+        is_fallback: bool = False,
     ):
         self.name = name
         self.category = category
@@ -54,6 +55,9 @@ class BaseAgent(ABC):
         self._embeddings = None
         self._llm = None
         self._router_callable = router_callable
+        # True => fallback responder. The MasterAgent only uses this agent
+        # when no specialist has relevant context for the question.
+        self.is_fallback = is_fallback
 
     def _get_llm(self) -> AgentLLM:
         if self._llm is None:

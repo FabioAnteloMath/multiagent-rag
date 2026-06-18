@@ -17,6 +17,7 @@ interface Message {
     total_time_ms?: number;
     confidence?: number;
     collection_searched?: string;
+    routing?: import("@/lib/api").RoutingInfo | null;
 }
 
 const agentConfig: Record<string, { bg: string; border: string; text: string; dot: string; icon: JSX.Element }> = {
@@ -65,6 +66,174 @@ const defaultConfig = { bg: "bg-slate-100", border: "border-slate-200", text: "t
 function formatTime(ms: number): string {
     if (ms < 1000) return `${Math.round(ms)}ms`;
     return `${(ms / 1000).toFixed(2)}s`;
+}
+
+function RoutingBadge({ routing }: { routing: import("@/lib/api").RoutingInfo }) {
+    const via = routing.via;
+    const conf = typeof routing.llm_confidence === "number" ? routing.llm_confidence : null;
+
+    const viaStyles: Record<string, { bg: string; text: string; label: string }> = {
+        llm:                   { bg: "bg-blue-50",    text: "text-blue-700",    label: "via LLM" },
+        keyword:               { bg: "bg-emerald-50", text: "text-emerald-700", label: "via keyword" },
+        llm_override_keyword:  { bg: "bg-amber-50",   text: "text-amber-700",   label: "keyword override" },
+        default:               { bg: "bg-slate-100",  text: "text-slate-600",   label: "default" },
+        clarifying:            { bg: "bg-purple-50",  text: "text-purple-700",  label: "clarifying" },
+    };
+    const style = viaStyles[via] ?? { bg: "bg-slate-100", text: "text-slate-600", label: via };
+
+    return (
+        <span
+            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs ${style.bg} ${style.text}`}
+            title={routing.reasoning || ""}
+        >
+            {style.label}
+            {conf !== null && (
+                <span className="opacity-70">
+                    ({Math.round(conf * 100)}%)
+                </span>
+            )}
+            {routing.keyword_matches && routing.keyword_matches.length > 0 && routing.keyword_matches[0] !== "general" && (
+                <span className="opacity-70 hidden sm:inline">
+                    · kw: {routing.keyword_matches.join(", ")}
+                </span>
+            )}
+        </span>
+    );
+}
+
+/**
+ * RoutingTrace — visual timeline of how a question got routed.
+ *
+ * Renders a vertical step list showing each decision the router made:
+ * classifier → keyword check → (optional) discovery → final agent.
+ * Color-coded by what fired (LLM, keyword, override, fallback).
+ */
+function RoutingTrace({ routing, question }: { routing: import("@/lib/api").RoutingInfo; question?: string }) {
+    const steps: Array<{
+        label: string;
+        detail: string;
+        tone: "blue" | "emerald" | "amber" | "slate" | "purple";
+        icon: string;
+    }> = [];
+
+    const llmCat = routing.llm_category ?? null;
+    const llmConf = typeof routing.llm_confidence === "number" ? routing.llm_confidence : null;
+    const kw = routing.keyword_matches ?? [];
+    const chosen = routing.chosen ?? [];
+
+    // Step 1 — classifier
+    if (llmCat) {
+        steps.push({
+            label: `Classifier → ${llmCat}`,
+            detail: llmConf !== null
+                ? `LLM confidence ${Math.round(llmConf * 100)}%`
+                : "LLM responded (confidence unknown)",
+            tone: llmConf !== null && llmConf < 0.6 ? "amber" : "blue",
+            icon: llmConf !== null && llmConf < 0.6 ? "⚠️" : "🧠",
+        });
+    } else {
+        steps.push({
+            label: "Classifier unavailable",
+            detail: routing.llm_raw
+                ? `raw: ${routing.llm_raw.slice(0, 60)}${routing.llm_raw.length > 60 ? "…" : ""}`
+                : "no usable response from LLM",
+            tone: "amber",
+            icon: "⚠️",
+        });
+    }
+
+    // Step 2 — keyword check (always runs)
+    if (kw.length > 0 && kw[0] !== "general") {
+        steps.push({
+            label: `Keyword → ${kw.join(", ")}`,
+            detail: "matched terms in the question text",
+            tone: "emerald",
+            icon: "🔑",
+        });
+    } else {
+        steps.push({
+            label: "Keyword → (no specific match)",
+            detail: "no keyword hit; fallback to general",
+            tone: "slate",
+            icon: "·",
+        });
+    }
+
+    // Step 3 — override / discovery / fallback narrative
+    if (routing.via === "llm_override_keyword") {
+        steps.push({
+            label: "Override → keyword wins",
+            detail: "LLM confidence was below threshold; keyword took over",
+            tone: "amber",
+            icon: "⚖️",
+        });
+    } else if (routing.discovered) {
+        steps.push({
+            label: `Discovery → ${chosen[0] ?? "?"}`,
+            detail: "retrieval probe picked this specialist (best FAISS distance)",
+            tone: "emerald",
+            icon: "🔍",
+        });
+    } else if (routing.via === "default") {
+        steps.push({
+            label: "Default → general",
+            detail: "no usable signal; falling back to last-resort agent",
+            tone: "slate",
+            icon: "↩️",
+        });
+    }
+
+    // Step 4 — final choice
+    if (chosen.length > 0) {
+        steps.push({
+            label: `Final → ${chosen.join(", ")}`,
+            detail: routing.reasoning || "delegated to this agent",
+            tone: "blue",
+            icon: "✅",
+        });
+    } else {
+        steps.push({
+            label: "Final → no agent",
+            detail: "system will ask the user to clarify",
+            tone: "purple",
+            icon: "❓",
+        });
+    }
+
+    const toneColors: Record<string, string> = {
+        blue: "border-blue-300 bg-blue-50/60",
+        emerald: "border-emerald-300 bg-emerald-50/60",
+        amber: "border-amber-300 bg-amber-50/60",
+        slate: "border-slate-200 bg-slate-50",
+        purple: "border-purple-300 bg-purple-50/60",
+    };
+
+    return (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                Routing trace
+            </div>
+            <ol className="space-y-1.5">
+                {steps.map((s, i) => (
+                    <li
+                        key={i}
+                        className={`flex items-start gap-2 px-2.5 py-1.5 rounded border-l-2 ${toneColors[s.tone] || toneColors.slate}`}
+                    >
+                        <span className="text-sm leading-none mt-0.5">{s.icon}</span>
+                        <div className="flex-1 min-w-0">
+                            <div className="text-xs font-medium text-slate-800">{s.label}</div>
+                            <div className="text-[11px] text-slate-500 leading-snug">{s.detail}</div>
+                        </div>
+                    </li>
+                ))}
+            </ol>
+            {routing.reasoning && (
+                <div className="mt-2 text-[11px] italic text-slate-500 px-1">
+                    &ldquo;{routing.reasoning}&rdquo;
+                </div>
+            )}
+        </div>
+    );
 }
 
 function renderMarkdown(text: string): string {
@@ -175,7 +344,9 @@ function renderMarkdown(text: string): string {
 export default function ChatPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
-    const [mode, setMode] = useState<"auto" | "single_rag">("single_rag");
+    // Multi-Agent is the only mode exposed to the user. The mode is locked
+    // here so any future addition has to be deliberate.
+    const MODE: "auto" = "auto";
     const [forceAgent, setForceAgent] = useState<string>("");
     const [loading, setLoading] = useState(false);
     const [apiOnline, setApiOnline] = useState(false);
@@ -224,7 +395,7 @@ export default function ChatPage() {
             const response: AskResponse = await askQuestion(
                 trimmedInput,
                 4,
-                mode,
+                MODE,
                 forceAgent || undefined
             );
 
@@ -242,6 +413,7 @@ export default function ChatPage() {
                 total_time_ms: response.total_time_ms,
                 confidence: response.confidence,
                 collection_searched: response.collection_searched,
+                routing: response.routing,
             };
             setMessages((prev) => [...prev, assistantMessage]);
         } catch (error) {
@@ -280,26 +452,23 @@ export default function ChatPage() {
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
+                        <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full">
+                            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                            Multi-Agent
+                        </span>
                         <select
-                            value={mode}
-                            onChange={(e) => setMode(e.target.value as typeof mode)}
+                            value={forceAgent}
+                            onChange={(e) => setForceAgent(e.target.value)}
                             className="bg-slate-100 border-0 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            title="Force a specific specialist instead of letting the router decide"
                         >
-                            <option value="single_rag">Single RAG</option>
-                            <option value="auto">Multi-Agent</option>
+                            <option value="">Auto Route</option>
+                            <option value="suporte_api">Force: API Support</option>
+                            <option value="database">Force: Database</option>
+                            <option value="devops">Force: DevOps</option>
+                            <option value="rag">Force: RAG</option>
+                            <option value="general">Force: Generalist (fallback)</option>
                         </select>
-                        {(mode === "auto" || mode === "single_rag") && (
-                            <select
-                                value={forceAgent}
-                                onChange={(e) => setForceAgent(e.target.value)}
-                                className="bg-slate-100 border-0 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                                <option value="">Auto Route</option>
-                                <option value="suporte_api">API Support</option>
-                                <option value="database">Database</option>
-                                <option value="devops">DevOps</option>
-                            </select>
-                        )}
                     </div>
                 </div>
             </div>
@@ -333,11 +502,14 @@ export default function ChatPage() {
                                     }`}
                                 >
                                     {!isUser && msg.agent_used && (
-                                        <div className="flex items-center gap-2 mb-3 pb-2 border-b border-slate-100">
+                                        <div className="flex flex-wrap items-center gap-2 mb-3 pb-2 border-b border-slate-100">
                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${agentStyle.bg} ${agentStyle.border} ${agentStyle.text}`}>
                                                 <span className={`w-1.5 h-1.5 rounded-full ${agentStyle.dot}`} />
                                                 {agentName}
                                             </span>
+                                            {msg.routing && (
+                                                <RoutingBadge routing={msg.routing} />
+                                            )}
                                             {msg.confidence !== undefined && (
                                                 <span className="text-xs text-slate-400">
                                                     {Math.round(msg.confidence * 100)}% confidence
@@ -371,38 +543,41 @@ export default function ChatPage() {
                                                 </span>
                                             </div>
 
-                                            {showDetails === msg.id && (
-                                                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
-                                                    {msg.sources && msg.sources.length > 0 && (
-                                                        <div className="flex flex-wrap gap-1">
-                                                            <span className="text-slate-500">Sources:</span>
-                                                            {msg.sources.map((s, i) => (
-                                                                <span key={i} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
-                                                                    {s.split('/').pop()}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    {msg.tokens_used !== undefined && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-slate-500">Tokens:</span>
-                                                            <span className="text-slate-700 font-mono">{msg.tokens_used}</span>
-                                                        </div>
-                                                    )}
-                                                    {msg.model_used && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-slate-500">Model:</span>
-                                                            <span className="text-slate-700 font-mono">{msg.model_used}</span>
-                                                        </div>
-                                                    )}
-                                                    {msg.total_time_ms !== undefined && (
-                                                        <div className="flex justify-between">
-                                                            <span className="text-slate-500">Response time:</span>
-                                                            <span className="text-slate-700 font-mono">{formatTime(msg.total_time_ms)}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+                            {showDetails === msg.id && (
+                                <div className="mt-3 pt-3 border-t border-slate-100 space-y-1.5 text-xs">
+                                    {msg.sources && msg.sources.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                            <span className="text-slate-500">Sources:</span>
+                                            {msg.sources.map((s, i) => (
+                                                <span key={i} className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                    {s.split('/').pop()}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {msg.tokens_used !== undefined && (
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Tokens:</span>
+                                            <span className="text-slate-700 font-mono">{msg.tokens_used}</span>
+                                        </div>
+                                    )}
+                                    {msg.model_used && (
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Model:</span>
+                                            <span className="text-slate-700 font-mono">{msg.model_used}</span>
+                                        </div>
+                                    )}
+                                    {msg.total_time_ms !== undefined && (
+                                        <div className="flex justify-between">
+                                            <span className="text-slate-500">Response time:</span>
+                                            <span className="text-slate-700 font-mono">{formatTime(msg.total_time_ms)}</span>
+                                        </div>
+                                    )}
+                                    {msg.routing && (
+                                        <RoutingTrace routing={msg.routing} question={msg.content} />
+                                    )}
+                                </div>
+                            )}
                                         </div>
                                     )}
                                 </div>

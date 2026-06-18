@@ -29,6 +29,12 @@ node_modules/
 
 # Logs
 *.log
+# Local dev-server logs (created by start_dev_all.ps1 / run_server.py)
+backend/*.err
+backend/*.out
+backend/pip_install.err
+frontend/*.err
+frontend/*.out
 
 # Agent tooling (opencode CLI, Mavis worktrees)
 .opencode/

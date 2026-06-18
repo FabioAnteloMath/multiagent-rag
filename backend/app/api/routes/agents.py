@@ -24,6 +24,7 @@ class AgentResponse(BaseModel):
     model_name: str
     temperature: float
     is_active: bool
+    is_fallback: bool = False
     created_at: str
 
     class Config:
@@ -42,6 +43,7 @@ class AgentCreate(BaseModel):
     provider: str = "minimax"
     model_name: str = "MiniMax-M2.7"
     temperature: float = 0.3
+    is_fallback: Optional[bool] = None  # None => auto-detect from name/specialty
 
 
 class AgentUpdate(BaseModel):
@@ -57,6 +59,7 @@ class AgentUpdate(BaseModel):
     model_name: Optional[str] = None
     temperature: Optional[float] = None
     is_active: Optional[bool] = None
+    is_fallback: Optional[bool] = None
 
 
 class AgentStats(BaseModel):
@@ -81,8 +84,20 @@ def _to_response(agent: Agent, collection_name: Optional[str]) -> AgentResponse:
         model_name=agent.model_name,
         temperature=agent.temperature if agent.temperature is not None else 0.3,
         is_active=bool(agent.is_active),
+        is_fallback=bool(agent.is_fallback),
         created_at=agent.created_at.isoformat() if agent.created_at else "",
     )
+
+
+# Specialties / names that strongly imply the agent is meant as a fallback
+# responder. When the user creates an agent with one of these, we auto-mark
+# it as fallback so they don't have to remember the checkbox.
+_FALLBACK_HINTS = ("general", "generalista", "geral", "fallback")
+
+
+def _looks_like_fallback(name: str, specialty: str) -> bool:
+    text = f"{name or ''} {specialty or ''}".strip().lower()
+    return any(hint in text for hint in _FALLBACK_HINTS)
 
 
 def _resolve_collection_name(db: Session, agent: Agent) -> Optional[str]:
@@ -111,6 +126,14 @@ def create_agent(agent_data: AgentCreate, db: Session = Depends(get_db)):
         f"Se a informacao nao estiver disponivel, diga claramente."
     )
 
+    # Resolve is_fallback: explicit value wins, else auto-detect from name/specialty,
+    # else default False. The auto path means a user creating "General Agent" doesn't
+    # have to remember the checkbox.
+    if agent_data.is_fallback is None:
+        is_fallback = _looks_like_fallback(agent_data.name, agent_data.specialty)
+    else:
+        is_fallback = agent_data.is_fallback
+
     new_agent = Agent(
         name=agent_data.name,
         specialty=agent_data.specialty,
@@ -124,6 +147,7 @@ def create_agent(agent_data: AgentCreate, db: Session = Depends(get_db)):
         model_name=agent_data.model_name,
         temperature=agent_data.temperature,
         is_active=True,
+        is_fallback=is_fallback,
     )
     db.add(new_agent)
     db.commit()
@@ -172,6 +196,8 @@ def update_agent(agent_id: str, update: AgentUpdate, db: Session = Depends(get_d
         agent.temperature = update.temperature
     if update.is_active is not None:
         agent.is_active = update.is_active
+    if update.is_fallback is not None:
+        agent.is_fallback = update.is_fallback
 
     db.commit()
     db.refresh(agent)
