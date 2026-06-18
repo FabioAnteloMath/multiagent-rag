@@ -284,12 +284,17 @@ def update_document(document_id: str, update_data: DocumentUpdate, db: Session =
     if not doc:
         raise HTTPException(status_code=404, detail="Documento nao encontrado")
 
-    if update_data.collection_id is not None:
-        if update_data.collection_id:
-            col = db.query(Collection).filter(Collection.id == update_data.collection_id).first()
+    # Distinguish "field absent in JSON" from "field explicitly null".
+    # - `collection_id: null`  -> detach the document from any collection.
+    # - `collection_id: "<uuid>"` -> assign it to that collection.
+    # - field absent            -> leave the current assignment untouched.
+    if "collection_id" in update_data.model_fields_set:
+        new_col_id = update_data.collection_id
+        if new_col_id is not None:
+            col = db.query(Collection).filter(Collection.id == new_col_id).first()
             if not col:
                 raise HTTPException(status_code=400, detail="Collection nao encontrada")
-        doc.collection_id = update_data.collection_id
+        doc.collection_id = new_col_id
 
     db.commit()
     return {"message": "Documento atualizado"}
