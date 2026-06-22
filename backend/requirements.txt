@@ -22,4 +22,4 @@ httpx>=0.28.1
 # Security Audit (dev)
 safety>=3.7.0
 bandit>=1.9.4
-pip-audit>=2.6.0
+pip-audit>=2.10.1
